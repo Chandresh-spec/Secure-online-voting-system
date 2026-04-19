@@ -8,7 +8,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-
     # JWT token refresh
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
