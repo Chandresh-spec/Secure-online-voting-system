@@ -25,6 +25,7 @@ urlpatterns = [
     path('vote/', TemplateView.as_view(template_name='vote.html'), name='vote'),
     path('results/', TemplateView.as_view(template_name='results.html'), name='results_page'),
     path('admin-panel/', TemplateView.as_view(template_name='admin.html'), name='admin_panel'),
+    path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
 ]
 
 if settings.DEBUG:

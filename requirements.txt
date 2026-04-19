@@ -16,3 +16,6 @@ gunicorn>=21.2
 
 # Image handling
 Pillow>=10.0
+
+# OCR — for voter card text extraction (requires Tesseract binary installed)
+pytesseract>=0.3.10
