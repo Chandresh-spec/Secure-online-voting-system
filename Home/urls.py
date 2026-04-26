@@ -8,7 +8,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-
     # JWT token refresh
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
@@ -26,6 +25,9 @@ urlpatterns = [
     path('vote/', TemplateView.as_view(template_name='vote.html'), name='vote'),
     path('results/', TemplateView.as_view(template_name='results.html'), name='results_page'),
     path('admin-panel/', TemplateView.as_view(template_name='admin.html'), name='admin_panel'),
+    path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
+    path('register-face/', TemplateView.as_view(template_name='register_face.html'), name='register_face'),
+    path('profile/', TemplateView.as_view(template_name='profile.html'), name='profile'),
 ]
 
 if settings.DEBUG:

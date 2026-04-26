@@ -109,6 +109,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ---------- OCR ----------
+
+# Path to Tesseract binary. Set TESSERACT_CMD env var on your machine.
+# Windows default: r'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+TESSERACT_CMD = os.environ.get('TESSERACT_CMD', '')
+
 # ---------- CORS ----------
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -172,3 +178,11 @@ CACHES = {
 # }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ---------- Email Configuration ----------
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'canaracollege5@gmail.com'
+EMAIL_HOST_PASSWORD = 'xjtrbetizsltfyeq'

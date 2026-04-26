@@ -6,6 +6,92 @@
     <meta name="description" content="Cast your vote securely and anonymously.">
     <title>SecureVote — Cast Your Vote</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/voice.css">
+    <link rel="stylesheet" href="/static/css/translate.css">
+    <style>
+        /* Airtel Style Verification UX */
+        .face-auth-container {
+            position: relative;
+            width: 250px;
+            height: 330px;
+            margin: 20px auto;
+            border-radius: 50%; /* Oval */
+            overflow: hidden;
+            background: #111;
+            box-shadow: 0 0 0 6px var(--border), 0 0 20px rgba(0,0,0,0.5);
+            transition: box-shadow 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .face-auth-container.active {
+            box-shadow: 0 0 0 6px var(--accent), 0 0 30px rgba(79, 70, 229, 0.4);
+        }
+
+        .face-auth-container.success {
+            box-shadow: 0 0 0 6px var(--success), 0 0 30px rgba(16, 185, 129, 0.6);
+        }
+
+        .face-auth-container.error {
+            box-shadow: 0 0 0 6px var(--danger), 0 0 30px rgba(239, 68, 68, 0.6);
+        }
+
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--accent-light);
+            box-shadow: 0 0 15px var(--accent-light);
+            animation: scan 2s infinite linear;
+            z-index: 10;
+            display: none;
+        }
+
+        .face-auth-container.active .scanner-line {
+            display: block;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+
+        .live-status {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+            margin: 10px 0;
+            min-height: 30px;
+            transition: color 0.3s ease;
+        }
+
+        .liveness-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+        .dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .dot.passed { background: var(--success); }
+
+        #webcam-video {
+            /* Transform to fill oval seamlessly without letterboxing */
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror camera */
+        }
+    </style>
 </head>
 <body>
     <!-- Navbar -->
@@ -16,6 +102,7 @@
                 <li><a href="/dashboard/">Dashboard</a></li>
                 <li><a href="/elections/" class="active">Elections</a></li>
                 <li><a href="/results/">Results</a></li>
+                <li><a href="/profile/">Profile</a></li>
             </ul>
             <div class="nav-user">
                 <span class="user-name" id="user-display"></span>
@@ -63,6 +150,79 @@
             </div>
         </div>
 
+        <div id="face-auth-section" class="hidden" style="text-align:center;margin-top:32px">
+            <div class="card" style="max-width:550px;margin:0 auto">
+                <h3>Live Identity Verification</h3>
+                <p class="text-muted mt-1" style="font-size:0.9rem">Follow the on-screen instructions to verify your identity.</p>
+                
+                <div class="form-group mt-2" style="max-width:300px; margin: 15px auto;">
+                    <input type="text" id="verify-voter-id" class="form-input" style="text-align:center; font-weight:bold; letter-spacing:1px;" placeholder="CONFIRM VOTER ID" required readonly>
+                </div>
+                
+                <!-- Airtel Style Webcam UX -->
+                <div class="face-auth-container" id="auth-container">
+                    <div class="scanner-line"></div>
+                    <video id="webcam-video" autoplay playsinline></video>
+                    <canvas id="snapshot-canvas" style="display:none;"></canvas>
+                </div>
+
+                <div class="live-status" id="live-status-text">Initializing Camera...</div>
+                
+                <div class="liveness-dots" id="liveness-dots" style="display:none;">
+                    <div class="dot" id="dot-1"></div>
+                    <div class="dot" id="dot-2"></div>
+                    <div class="dot" id="dot-3"></div>
+                </div>
+
+                <p id="attempts-display" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:15px"></p>
+                
+                <div id="face-alert" class="alert hidden" style="margin-bottom:15px"></div>
+
+                <div class="flex gap-2" style="justify-content:center; margin-top:20px;">
+                    <button class="btn btn-primary" id="start-verification-btn" onclick="startLivenessCheck()" style="display:none;">
+                        Start Verification
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelFaceAuth()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Verification Section -->
+        <div id="email-auth-section" class="hidden" style="text-align:center;margin-top:32px">
+            <div class="card" style="max-width:500px;margin:0 auto">
+                <h3>Verify Email to Receive OTP</h3>
+                <p class="mt-1 text-muted">Please enter your registered Gmail address to receive the verification OTP.</p>
+                <div class="form-group mt-2" style="max-width:300px; margin: 15px auto;">
+                    <input type="email" id="vote-email-input" class="form-input" style="text-align:center;" placeholder="Enter your email" required>
+                </div>
+                <p id="email-alert" class="alert hidden" style="font-size:0.85rem; margin-bottom:15px"></p>
+                <div class="mt-2 flex gap-2" style="justify-content:center">
+                    <button class="btn btn-primary btn-lg" id="trigger-otp-btn" onclick="triggerSendOTP()">
+                        Send OTP
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelEmailAuth()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- OTP Verification Section -->
+        <div id="otp-auth-section" class="hidden" style="text-align:center;margin-top:32px">
+            <div class="card" style="max-width:500px;margin:0 auto">
+                <h3>Enter OTP</h3>
+                <p class="mt-1 text-muted">An OTP has been sent to your email address.</p>
+                <div class="form-group mt-2" style="max-width:300px; margin: 15px auto;">
+                    <input type="text" id="vote-otp-input" class="form-input" style="text-align:center; font-weight:bold; letter-spacing:2px; font-size:1.2rem;" placeholder="Enter 6-digit OTP" required maxlength="6">
+                </div>
+                <p id="otp-alert" class="alert hidden" style="font-size:0.85rem; margin-bottom:15px"></p>
+                <div class="mt-2 flex gap-2" style="justify-content:center">
+                    <button class="btn btn-success btn-lg" id="submit-otp-btn" onclick="submitVoteOTP()">
+                        ✓ Confirm OTP & Vote
+                    </button>
+                    <button class="btn btn-secondary" onclick="cancelVoteOTP()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Success -->
         <div id="vote-success" class="hidden" style="text-align:center;padding:60px 20px">
             <div style="font-size:4rem;margin-bottom:16px">✅</div>
@@ -76,6 +236,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
     <script src="/static/js/api.js"></script>
     <script>
         if (!requireAuth()) {}
@@ -150,27 +312,437 @@
             document.getElementById('vote-action').classList.add('hidden');
         }
 
+        // confirmVote is defined below with full liveness flow
+
+        // FaceMesh and CameraUtils are loaded via script tags in the head/body
+
+        let stream = null;
+        let faceMesh = null;
+        let livenessState = 'INIT'; // INIT, ALIGN, BLINK, TURN, READY
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+
         async function confirmVote() {
             if (!selectedCandidateId) return;
 
-            const btn = document.getElementById('confirm-btn');
-            btn.disabled = true;
-            btn.textContent = 'Submitting...';
+            if (user && user.voter_id) {
+                document.getElementById('verify-voter-id').value = user.voter_id;
+            }
 
+            document.getElementById('voting-section').classList.add('hidden');
+            document.getElementById('face-auth-section').classList.remove('hidden');
+            document.getElementById('face-alert').classList.add('hidden');
+            
+            attempts = 0;
+            document.getElementById('attempts-display').textContent = `Attempts remaining: ${MAX_ATTEMPTS}`;
+            
+            await startCamera();
+        }
+
+        async function startCamera() {
             try {
-                const result = await castVote(electionId, selectedCandidateId);
-                document.getElementById('voting-section').classList.add('hidden');
-                document.getElementById('vote-success').classList.remove('hidden');
-                document.getElementById('vote-hash').textContent = result.vote_hash;
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Camera API not available. Make sure you are using localhost or HTTPS.");
+                }
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const videoEl = document.getElementById('webcam-video');
+                videoEl.srcObject = stream;
+                
+                await new Promise(resolve => { videoEl.onloadedmetadata = resolve; });
+                videoEl.play();
+
+                setStatus("Position face in the oval", "var(--text)");
+                document.getElementById('start-verification-btn').style.display = "inline-block";
+                
+                initMediaPipe(videoEl);
             } catch (err) {
-                const msg = err.data?.error || 'Failed to cast vote.';
-                showToast(msg, 'error');
-                btn.disabled = false;
-                btn.textContent = '✓ Cast My Vote';
+                console.error("Webcam error:", err);
+                showFaceAlert(`Camera Error: ${err.message || 'Permission denied'}`, 'error');
             }
         }
 
-        function handleLogout() { clearAuth(); window.location.href = '/'; }
+        function initMediaPipe(videoElement) {
+            if (typeof FaceMesh === 'undefined' || typeof Camera === 'undefined') {
+                showFaceAlert("AI Face Libraries failed to load. Please check your internet connection or disable adblockers, then refresh the page.", "error");
+                setStatus("Library Load Error", "var(--danger)");
+                return;
+            }
+            if (faceMesh) return; // already initialized
+            
+            faceMesh = new FaceMesh({locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }});
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            faceMesh.onResults(onFaceMeshResults);
+
+            // Create a camera utility loop
+            const camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (livenessState !== 'VERIFYING' && livenessState !== 'SUCCESS') {
+                        try {
+                            await faceMesh.send({image: videoElement});
+                        } catch (e) {
+                            console.error("FaceMesh send error:", e);
+                        }
+                    }
+                },
+                width: 640,
+                height: 480
+            });
+            camera.start();
+        }
+
+        function setStatus(text, color) {
+            const el = document.getElementById('live-status-text');
+            el.textContent = text;
+            el.style.color = color;
+        }
+        function setDot(index, state) {
+            const dot = document.getElementById(`dot-${index}`);
+            dot.className = `dot ${state}`;
+        }
+        function showFaceAlert(message, type) {
+            const alertBox = document.getElementById('face-alert');
+            alertBox.className = `alert alert-${type}`;
+            alertBox.innerHTML = `❌ ${message}`;
+            alertBox.classList.remove('hidden');
+        }
+
+        function startLivenessCheck() {
+            document.getElementById('start-verification-btn').style.display = "none";
+            document.getElementById('auth-container').className = "face-auth-container active";
+            document.getElementById('liveness-dots').style.display = "flex";
+            
+            livenessState = 'ALIGN';
+            setStatus("Detecting Face...", "var(--accent-light)");
+            setDot(1, 'active'); setDot(2, ''); setDot(3, '');
+        }
+
+        // Liveness loop processing
+        function onFaceMeshResults(results) {
+            if (livenessState === 'INIT' || livenessState === 'VERIFYING') return;
+
+            if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+                if (livenessState !== 'ALIGN') {
+                    // Reset if face lost
+                    startLivenessCheck();
+                }
+                return;
+            }
+
+            const landmarks = results.multiFaceLandmarks[0];
+            
+            if (livenessState === 'ALIGN') {
+                // Ensure face is somewhat centered (nose landmark 1)
+                const nose = landmarks[1];
+                if (nose.x > 0.3 && nose.x < 0.7 && nose.y > 0.3 && nose.y < 0.7) {
+                    livenessState = 'BLINK';
+                    setDot(1, 'passed'); setDot(2, 'active');
+                    setStatus("Slowly blink your eyes", "var(--text)");
+                } else {
+                    setStatus("Please center your face", "var(--warning)");
+                }
+            } 
+            else if (livenessState === 'BLINK') {
+                // Simple EAR threshold approach using upper/lower eyelid diff
+                const leftUpper = landmarks[159].y; const leftLower = landmarks[145].y;
+                const rightUpper = landmarks[386].y; const rightLower = landmarks[374].y;
+                // If y dist is extremely small, eyes are closed
+                if ((leftLower - leftUpper) < 0.015 && (rightLower - rightUpper) < 0.015) {
+                    livenessState = 'TURN';
+                    setDot(2, 'passed'); setDot(3, 'active');
+                    setStatus("Turn head slightly to the left", "var(--text)");
+                }
+            }
+            else if (livenessState === 'TURN') {
+                const noseX = landmarks[1].x;
+                // If nose x is closer to the edge (turned left from mirror view)
+                if (noseX > 0.6) {
+                    livenessState = 'READY';
+                    setDot(3, 'passed');
+                    setStatus("Hold still...", "var(--success)");
+                    
+                    // Proceed to verify
+                    setTimeout(() => verifyAndCastVote(), 1000);
+                }
+            }
+        }
+
+        async function verifyAndCastVote() {
+            if (livenessState === 'VERIFYING') return;
+            livenessState = 'VERIFYING';
+            document.getElementById('auth-container').className = "face-auth-container";
+            setStatus("Authenticating via AI...", "var(--warning)");
+            document.getElementById('face-alert').classList.add('hidden');
+
+            const voterId = document.getElementById('verify-voter-id').value.trim();
+            const video = document.getElementById('webcam-video');
+            
+            try {
+                // 1. Capture snapshot
+                const canvas = document.getElementById('snapshot-canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                
+                // 2. Transmit — voter_id is handled server-side from the authenticated user
+                const formData = new FormData();
+                formData.append('live_image', blob, 'capture.jpg');
+                
+                const token = getTokens()?.access;
+                const verifyRes = await fetch('/api/auth/verify-face/', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData,
+                });
+                const verifyData = await verifyRes.json();
+
+                if (!verifyRes.ok || !verifyData.verified) {
+                    throw new Error(verifyData.error || verifyData.message || 'Face verification failed.');
+                }
+
+                // FACE VERIFIED — now ask for Email
+                livenessState = 'SUCCESS';
+                document.getElementById('auth-container').className = "face-auth-container success";
+                setStatus("Identity Confirmed!", "var(--success)");
+                stopCamera();
+                
+                setTimeout(() => {
+                    document.getElementById('face-auth-section').classList.add('hidden');
+                    document.getElementById('email-auth-section').classList.remove('hidden');
+                    VoiceEngine.speak("Face verified. Please enter your registered email address to receive an OTP.");
+                }, 1000);
+
+            } catch (err) {
+                // FACE VERIFICATION FAILED
+                attempts++;
+                const msg = err.message || err.data?.error || 'Failed to verify face.';
+                document.getElementById('auth-container').className = "face-auth-container error";
+                
+                if (attempts >= MAX_ATTEMPTS) {
+                    setStatus("Access Denied", "var(--danger)");
+                    showFaceAlert("Maximum attempts reached. You cannot cast this vote.", "error");
+                    stopCamera();
+                    document.getElementById('attempts-display').textContent = 'You have been locked out of this vote.';
+                } else {
+                    setStatus("Verification Failed", "var(--danger)");
+                    showFaceAlert(msg + " Please try again.", "error");
+                    document.getElementById('attempts-display').textContent = `Attempts remaining: ${MAX_ATTEMPTS - attempts}`;
+                    
+                    // Reset to retry
+                    setTimeout(() => {
+                        document.getElementById('auth-container').className = "face-auth-container";
+                        document.getElementById('face-alert').classList.add('hidden');
+                        startLivenessCheck();
+                    }, 3000);
+                }
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        }
+
+        function cancelFaceAuth() {
+            stopCamera();
+            livenessState = 'INIT';
+            document.getElementById('face-auth-section').classList.add('hidden');
+            document.getElementById('voting-section').classList.remove('hidden');
+        }
+
+        async function triggerSendOTP() {
+            const email = document.getElementById('vote-email-input').value.trim();
+            const alertEl = document.getElementById('email-alert');
+            
+            if (!email) {
+                alertEl.textContent = '❌ Please enter your email';
+                alertEl.className = 'alert alert-error';
+                alertEl.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('trigger-otp-btn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            alertEl.classList.add('hidden');
+
+            try {
+                await sendVoteOTP(email);
+                document.getElementById('email-auth-section').classList.add('hidden');
+                document.getElementById('otp-auth-section').classList.remove('hidden');
+                VoiceEngine.speak("An OTP has been sent. Please enter it to complete your vote.");
+            } catch (err) {
+                const msg = err.data?.error || err.message || 'Failed to send OTP.';
+                alertEl.textContent = `❌ ${msg}`;
+                alertEl.className = 'alert alert-error';
+                alertEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send OTP';
+            }
+        }
+
+        function cancelEmailAuth() {
+            document.getElementById('email-auth-section').classList.add('hidden');
+            document.getElementById('voting-section').classList.remove('hidden');
+            document.getElementById('vote-email-input').value = '';
+            document.getElementById('email-alert').classList.add('hidden');
+        }
+
+        async function submitVoteOTP() {
+            const otpCode = document.getElementById('vote-otp-input').value.trim();
+            if (otpCode.length !== 6) {
+                const alertEl = document.getElementById('otp-alert');
+                alertEl.textContent = '❌ Please enter a 6-digit OTP';
+                alertEl.className = 'alert alert-error';
+                alertEl.classList.remove('hidden');
+                return;
+            }
+            
+            const btn = document.getElementById('submit-otp-btn');
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+
+            try {
+                const result = await castVote(electionId, selectedCandidateId, otpCode);
+                document.getElementById('otp-auth-section').classList.add('hidden');
+                document.getElementById('vote-success').classList.remove('hidden');
+                document.getElementById('vote-hash').textContent = result.vote_hash;
+                VoiceEngine.speak("Vote Cast Successfully. Thank you for voting.");
+            } catch (voteErr) {
+                const voteMsg = voteErr.data?.error || voteErr.message || 'Failed to cast vote.';
+                const alertEl = document.getElementById('otp-alert');
+                alertEl.textContent = `❌ ${voteMsg}`;
+                alertEl.className = 'alert alert-error';
+                alertEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✓ Confirm OTP & Vote';
+            }
+        }
+
+        function cancelVoteOTP() {
+            document.getElementById('otp-auth-section').classList.add('hidden');
+            document.getElementById('voting-section').classList.remove('hidden');
+            document.getElementById('vote-otp-input').value = '';
+            document.getElementById('otp-alert').classList.add('hidden');
+        }
+    </script>
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/translate.js"></script>
+    <script src="/static/js/voice.js"></script>
+    <script>
+        function readCandidatesList() {
+            const cards = document.querySelectorAll('.candidate-card');
+            if (cards.length === 0) return 'No candidates found for this election.';
+            let text = `There are ${cards.length} candidates. `;
+            cards.forEach((card, i) => {
+                const name = card.querySelector('.candidate-name')?.textContent || 'Unknown';
+                const party = card.querySelector('.candidate-party')?.textContent || '';
+                text += `Number ${i+1}: ${name} from ${party}. `;
+            });
+            text += 'Say select candidate followed by the number to choose. Then say confirm vote.';
+            return text;
+        }
+
+        VoiceEngine.init({
+            guideSteps: [
+                { text: 'This is the voting page. Select a candidate and cast your vote.', speak: 'This is the voting page. You can select a candidate and cast your vote securely.' },
+                {
+                    text: 'I will now read out the available candidates.',
+                    speak: '',
+                    action: () => {
+                        setTimeout(() => {
+                            const title = document.getElementById('election-title')?.textContent || 'this election';
+                            VoiceEngine.speak('You are voting in ' + title + '. ' + readCandidatesList());
+                        }, 500);
+                    }
+                },
+                { text: 'Say "select candidate [number]" or "vote for [name]" to select.', speak: 'Say select candidate followed by the number. For example, select candidate 1. Or say vote for followed by the candidate name.' },
+                { text: 'After selecting, say "confirm vote" to proceed to face verification.', speak: 'After selecting, say confirm vote to proceed. Your face will be verified for security.' },
+                { text: 'The face verification will start automatically. Follow the on-screen instructions.', speak: 'Face verification will start automatically. Align your face, blink, and turn your head as instructed.' },
+            ],
+            commands: [
+                {
+                    patterns: [/select candidate (\d+)/, /candidate number (\d+)/, /choose candidate (\d+)/],
+                    handler: (text, match) => {
+                        const num = parseInt(match[1]) - 1;
+                        const cards = document.querySelectorAll('.candidate-card');
+                        if (cards[num]) {
+                            cards[num].click();
+                            const name = cards[num].querySelector('.candidate-name')?.textContent || '';
+                            VoiceEngine.speak('Selected ' + name + '. Say confirm vote to proceed, or cancel to change.');
+                        } else {
+                            VoiceEngine.speak('Candidate number ' + (num+1) + ' was not found.');
+                        }
+                    },
+                    description: 'Select a candidate by number'
+                },
+                {
+                    patterns: [/vote for (.+)/],
+                    handler: (text, match) => {
+                        const searchName = match[1].trim().toLowerCase();
+                        const cards = document.querySelectorAll('.candidate-card');
+                        let found = false;
+                        cards.forEach(card => {
+                            const name = card.querySelector('.candidate-name')?.textContent?.toLowerCase() || '';
+                            if (name.includes(searchName)) {
+                                card.click();
+                                VoiceEngine.speak('Selected ' + card.querySelector('.candidate-name').textContent + '. Say confirm vote to proceed.');
+                                found = true;
+                            }
+                        });
+                        if (!found) VoiceEngine.speak('Could not find a candidate named ' + searchName + '. Try saying the candidate number instead.');
+                    },
+                    description: 'Vote for a candidate by name'
+                },
+                {
+                    patterns: ['confirm vote', 'confirm my vote', 'cast my vote', 'cast vote', 'submit vote'],
+                    handler: () => {
+                        if (selectedCandidateId) {
+                            VoiceEngine.speak('Confirming your vote. Starting face verification now.');
+                            setTimeout(() => confirmVote(), 1500);
+                        } else {
+                            VoiceEngine.speak('Please select a candidate first. Say select candidate followed by the number.');
+                        }
+                    },
+                    description: 'Confirm and cast vote'
+                },
+                {
+                    patterns: ['cancel', 'cancel vote', 'change candidate'],
+                    handler: () => {
+                        cancelSelection();
+                        VoiceEngine.speak('Selection cancelled. You can choose a different candidate.');
+                    },
+                    description: 'Cancel current selection'
+                },
+                {
+                    patterns: ['start verification', 'verify face', 'start face', 'scan face'],
+                    handler: () => {
+                        if (document.getElementById('start-verification-btn')?.style.display !== 'none') {
+                            startLivenessCheck();
+                            VoiceEngine.speak('Face verification starting. Please follow the instructions.');
+                        }
+                    },
+                    description: 'Start face verification'
+                },
+                {
+                    patterns: ['read candidates', 'list candidates', 'who are the candidates', 'show candidates'],
+                    handler: () => VoiceEngine.speak(readCandidatesList()),
+                    description: 'Read all candidates aloud'
+                }
+            ]
+        });
     </script>
 </body>
 </html>
