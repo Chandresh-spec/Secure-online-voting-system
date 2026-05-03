@@ -1,257 +1,752 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Secure Online Voting System — Register or login to participate in democratic elections.">
-    <title>SecureVote — Login</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/voice.css">
-    <link rel="stylesheet" href="/static/css/translate.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Secure Online Voting System — Login or register to vote.">
+<title>SecureVote — Login</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/voice.css">
+<link rel="stylesheet" href="/static/css/translate.css">
+<style>
+/* ── Progressive form base ── */
+.auth-card { position: relative; overflow: hidden; }
+
+.prog-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 24px;
+}
+.prog-back {
+    background: none; border: none; color: var(--text-muted, #a38d82);
+    font-size: 1.1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+    transition: all .2s;
+}
+.prog-back:hover { background: rgba(74,46,36,.08); color: var(--text-primary, #4a2e24); }
+.prog-bar-wrap { flex:1; height:3px; background: rgba(74,46,36,.1); border-radius:2px; overflow:hidden; }
+.prog-bar-fill {
+    height:100%;
+    background: linear-gradient(90deg, #c14336, #d6594d);
+    border-radius:2px;
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+}
+.prog-label { font-size:.72rem; color:var(--text-muted, #a38d82); white-space:nowrap; font-weight:600; }
+
+/* ── Question viewport ── */
+.q-viewport { position:relative; min-height:300px; }
+.q-slide {
+    position:absolute; width:100%; top:0; left:0;
+    opacity:0; transform:translateX(60px); pointer-events:none;
+    transition: opacity .4s ease, transform .4s cubic-bezier(.4,0,.2,1);
+}
+.q-slide.active  { opacity:1; transform:translateX(0); pointer-events:all; }
+.q-slide.exiting { opacity:0; transform:translateX(-60px); pointer-events:none; }
+
+/* ── Question UI ── */
+.q-icon { font-size:2rem; margin-bottom:8px; }
+.q-title { font-size:1.2rem; font-weight:700; color: var(--text-primary, #4a2e24); margin-bottom:5px; line-height:1.4; }
+.q-hint  { font-size:.78rem; color: var(--text-secondary, #7a5a4a); margin-bottom:18px; line-height:1.5; }
+.q-input {
+    width:100%; box-sizing:border-box;
+    background: #ffffff; border:1.5px solid #cccccc;
+    border-radius:12px; padding:14px 18px; font-size:1rem; color: var(--text-primary, #4a2e24);
+    outline:none; transition: border-color .2s, box-shadow .2s;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+.q-input:focus { border-color: var(--accent, #c14336); box-shadow:0 0 0 3px rgba(193,67,54,.18); }
+.q-input[readonly] { background: rgba(193,67,54,.04); border-color: rgba(193,67,54,.2); color: var(--text-muted, #a38d82); cursor:default; }
+.q-input.otp  { text-align:center; font-size:2rem; letter-spacing:18px; font-weight:700; }
+.q-input.pass { font-size:1.2rem; letter-spacing:4px; }
+.q-input.upper { text-transform:uppercase; letter-spacing:2px; }
+.q-msg { margin-top:8px; min-height:18px; font-size:.78rem; }
+.q-msg.ok  { color: var(--success, #5e7a4b); }
+.q-msg.err { color: var(--danger, #b03a2e); }
+.q-msg.inf { color: var(--info, #4b6a8a); }
+
+/* ── Next button ── */
+.q-footer { display:flex; align-items:center; gap:10px; margin-top:20px; }
+.q-btn {
+    background: var(--gradient-1, linear-gradient(to bottom, #d14d3f 0%, #b1382b 100%));
+    color:#fff; border:1px solid #8c2a1f; border-radius:10px;
+    padding:12px 28px; font-size:.95rem; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.2);
+    text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+    transition: transform .15s, box-shadow .15s, opacity .2s;
+}
+.q-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 4px 8px rgba(193,67,54,.4); }
+.q-btn:active { transform:scale(.97); }
+.q-btn:disabled { opacity:.5; cursor:not-allowed; }
+.q-enter-hint { font-size:.7rem; color: var(--text-muted, #a38d82); }
+.q-enter-hint kbd {
+    background: rgba(74,46,36,.06); border:1px solid rgba(74,46,36,.15);
+    border-radius:4px; padding:1px 5px; font-size:.65rem; color: var(--text-secondary, #7a5a4a);
+}
+
+/* ── Verified strip ── */
+.verified-strip {
+    display:flex; align-items:center; gap:10px;
+    background: var(--success-bg, rgba(94,122,75,.15)); border:1px solid rgba(94,122,75,.3);
+    border-radius:10px; padding:10px 14px; margin-bottom:14px;
+    font-size:.8rem; color: var(--success, #5e7a4b); font-weight:600;
+}
+
+/* ── Success screen ── */
+.success-screen { text-align:center; padding:20px 0; }
+.success-screen .big-icon { font-size:4rem; animation:popIn .5s cubic-bezier(.175,.885,.32,1.275); }
+.success-screen h2 { font-size:1.3rem; margin:12px 0 8px; color: var(--text-primary, #4a2e24); }
+.success-screen p  { font-size:.85rem; color: var(--text-secondary, #7a5a4a); }
+
+/* ── Spinner ── */
+.spin { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spinR .7s linear infinite; vertical-align:middle; margin-right:5px; }
+@keyframes spinR { to { transform:rotate(360deg); } }
+@keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+
+.modal-overlay {
+    position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+    background: rgba(0,0,0,0.7) !important; display: flex !important; align-items: center !important; justify-content: center !important;
+    z-index: 99999 !important;
+}
+.modal-overlay.hidden { display: none !important; }
+
+.modal-content {
+    background: #fff !important; padding: 30px !important; border-radius: 12px !important; width: 90% !important; max-width: 400px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important; color: #333 !important;
+}
+.modal-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 20px !important; }
+.close-btn { background: none !important; border: none !important; font-size: 2rem !important; cursor: pointer !important; color: #999 !important; }
+
+</style>
+<script>
+/* ── Robust Forgot Password Logic ── */
+function openForgotModal(e) {
+    if(e && e.preventDefault) e.preventDefault();
+    console.log("Forgot Password Clicked");
+    const m = document.getElementById('forgot-modal');
+    if(m) {
+        m.classList.remove('hidden');
+        m.classList.add('active');
+        const s1 = document.getElementById('forgot-step-1');
+        const s2 = document.getElementById('forgot-step-2');
+        if(s1) s1.classList.remove('hidden');
+        if(s2) s2.classList.add('hidden');
+        const msg = document.getElementById('forgot-msg');
+        if(msg) msg.textContent = '';
+    } else {
+        console.error("Modal element not found!");
+    }
+}
+function closeForgotModal() {
+    const m = document.getElementById('forgot-modal');
+    if(m) {
+        m.classList.add('hidden');
+        m.classList.remove('active');
+    }
+}
+</script>
 </head>
 <body>
-    <div class="auth-wrapper">
-        <div class="auth-card">
-            <div class="auth-header">
-                <div class="logo">🗳️</div>
-                <h1 data-i18n="app.name">SecureVote</h1>
-                <p data-i18n="app.tagline">Secure Online Voting System</p>
+<div class="auth-wrapper">
+<div class="auth-card">
+
+    <!-- Header -->
+    <div class="auth-header">
+        <div class="logo">🗳️</div>
+        <h1>SecureVote</h1>
+        <p>Secure Online Voting System</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab active" id="tab-login"    onclick="switchTab('login')">Login</button>
+        <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <!-- ══ LOGIN ══ -->
+    <form id="login-form" onsubmit="doLogin(event)">
+        <div id="login-err"></div>
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" id="l-email" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-input" id="l-pass" placeholder="••••••••" required>
+            <div style="text-align:right;margin-top:5px; position:relative; z-index:20;">
+                <a href="javascript:void(0)" onclick="openForgotModal(event)" id="forgot-link" style="font-size:0.85rem; color:var(--accent); text-decoration:underline; cursor:pointer; pointer-events:auto; display:inline-block;">Forgot Password?</a>
             </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="login-btn">Sign In</button>
+    </form>
 
-            <!-- Tabs -->
-            <div class="auth-tabs">
-                <button class="auth-tab active" onclick="showTab('login')" data-i18n="btn.login">Login</button>
-                <button class="auth-tab" onclick="showTab('register')" data-i18n="btn.register">Register</button>
-            </div>
+    <!-- ══ PROGRESSIVE REGISTER ══ -->
+    <div id="reg-progressive" class="hidden">
+        <!-- Progress header -->
+        <div class="prog-header">
+            <button class="prog-back" id="prog-back-btn" onclick="goBack()" title="Back">←</button>
+            <div class="prog-bar-wrap"><div class="prog-bar-fill" id="prog-bar"></div></div>
+            <span class="prog-label" id="prog-label">1 / 10</span>
+        </div>
 
-            <!-- Login Form -->
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div id="login-alert"></div>
-                <div class="form-group">
-                    <label class="form-label" data-i18n="auth.email">Email</label>
-                    <input type="email" class="form-input" id="login-email" placeholder="you@example.com" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" data-i18n="auth.password">Password</label>
-                    <input type="password" class="form-input" id="login-password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="login-btn">
-                    <span data-i18n="btn.signIn">Sign In</span>
-                </button>
-            </form>
+        <!-- Verified strip (shown after OTP verified) -->
+        <div class="verified-strip hidden" id="verified-strip">
+            ✅ &nbsp;<span id="verified-name">Voter verified</span>
+        </div>
 
-            <!-- Register Form -->
-            <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
-                <div id="register-alert"></div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="auth.firstName">First Name</label>
-                        <input type="text" class="form-input" id="reg-fname" placeholder="First name" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="auth.lastName">Last Name</label>
-                        <input type="text" class="form-input" id="reg-lname" placeholder="Last name" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" data-i18n="auth.email">Email</label>
-                    <input type="email" class="form-input" id="reg-email" placeholder="you@example.com" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Username</label>
-                    <input type="text" class="form-input" id="reg-username" placeholder="Choose a username" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Phone</label>
-                    <input type="tel" class="form-input" id="reg-phone" placeholder="+91 9876543210">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" data-i18n="auth.password">Password</label>
-                        <input type="password" class="form-input" id="reg-password" minlength="8" placeholder="Min 8 chars" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password</label>
-                        <input type="password" class="form-input" id="reg-password2" minlength="8" placeholder="Confirm" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">State</label>
-                        <input type="text" class="form-input" id="reg-state" placeholder="Karnataka">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">District</label>
-                        <input type="text" class="form-input" id="reg-district" placeholder="Bangalore">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Village / City</label>
-                    <input type="text" class="form-input" id="reg-village" placeholder="Your village or city">
-                </div>
-                <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="register-btn">
-                    Create Account
-                </button>
-            </form>
+        <!-- Question slides -->
+        <div class="q-viewport" id="q-viewport"></div>
+    </div>
 
-            <!-- OTP Form -->
-            <form id="otp-form" class="hidden" onsubmit="handleOTP(event)">
-                <div id="otp-alert"></div>
-                <div class="auth-header" style="margin-bottom:16px">
-                    <h2 style="font-size:1.25rem">Verify Your Account</h2>
-                    <p>Enter the OTP sent to your email/phone</p>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">OTP Code</label>
-                    <input type="text" class="form-input" id="otp-code" placeholder="123456" maxlength="6" required style="text-align:center;font-size:1.5rem;letter-spacing:8px">
-                </div>
-                <p id="mock-otp-display" class="text-center text-muted mb-2" style="font-size:0.85rem"></p>
-                <button type="submit" class="btn btn-success btn-lg" style="width:100%">
-                    Verify OTP
-                </button>
-            </form>
-
-            <div class="auth-footer" id="auth-footer">
-                Secure • Transparent • Democratic
-            </div>
+    <!-- ══ SUCCESS ══ -->
+    <div id="reg-success" class="hidden">
+        <div class="success-screen">
+            <div class="big-icon">🎉</div>
+            <h2>You're registered!</h2>
+            <p id="success-msg">Redirecting to your dashboard…</p>
         </div>
     </div>
 
-    <script src="/static/js/api.js"></script>
-    <script>
-        // Redirect if already logged in
-        if (isLoggedIn()) window.location.href = '/dashboard/';
+</div>
+</div>
 
-        let pendingEmail = '';
+<script src="/static/js/api.js"></script>
+<script>
+console.log("SecureVote Auth Script Initializing...");
 
-        function showTab(tab) {
-            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
-            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
-            document.getElementById('otp-form').classList.add('hidden');
-            event.target.classList.add('active');
+/* ══════════════════════════════════════════
+   FORGOT PASSWORD API HANDLERS
+══════════════════════════════════════════ */
+async function handleForgotRequest() {
+    const emailEl = document.getElementById('f-email');
+    const email = emailEl ? emailEl.value : '';
+    if(!email) return;
+    const btn = document.getElementById('forgot-req-btn');
+    const msg = document.getElementById('forgot-msg');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Sending…';
+    try {
+        const res = await requestPasswordReset(email);
+        document.getElementById('forgot-step-1').classList.add('hidden');
+        document.getElementById('forgot-step-2').classList.remove('hidden');
+        msg.innerHTML = '<span style="color:#22c55e">✓ ' + (res.message || 'OTP Sent') + '</span>';
+        
+        if (res.dev_otp) {
+            const otpInp = document.getElementById('f-otp');
+            if(otpInp) otpInp.value = res.dev_otp;
+            msg.innerHTML += '<br><span style="color:#3b82f6">Dev Mode: OTP is ' + res.dev_otp + '</span>';
         }
+    } catch(err) {
+        console.error("Forgot Request Error:", err);
+        const errMsg = (err.data && err.data.error) ? err.data.error : 'Request failed.';
+        msg.innerHTML = '<span style="color:#ef4444">✗ ' + errMsg + '</span>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send OTP →';
+    }
+}
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            btn.disabled = true;
-            btn.textContent = 'Signing in...';
+async function handleForgotConfirm() {
+    const emailInp = document.getElementById('f-email');
+    const otpInp = document.getElementById('f-otp');
+    const passInp = document.getElementById('f-pass');
+    
+    const email = emailInp ? emailInp.value : '';
+    const otp = otpInp ? otpInp.value : '';
+    const pass = passInp ? passInp.value : '';
+    
+    const btn = document.getElementById('forgot-conf-btn');
+    const msg = document.getElementById('forgot-msg');
 
-            try {
-                const data = await login(
-                    document.getElementById('login-email').value,
-                    document.getElementById('login-password').value
-                );
-                saveTokens(data.tokens);
-                saveUser(data.user);
-                // Redirect based on verification status
-                if (data.user.is_verified) {
-                    window.location.href = '/dashboard/';
-                } else {
-                    window.location.href = '/verify/';
-                }
-            } catch (err) {
-                const msg = err.data?.non_field_errors?.[0] || err.data?.error || 'Login failed.';
-                document.getElementById('login-alert').innerHTML =
-                    `<div class="alert alert-error">✗ ${msg}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Sign In';
-            }
-        }
+    if(!otp || !pass) return;
 
-        async function handleRegister(e) {
-            e.preventDefault();
-            const btn = document.getElementById('register-btn');
-            btn.disabled = true;
-            btn.textContent = 'Creating account...';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Resetting…';
+    try {
+        const res = await confirmPasswordReset(email, otp, pass);
+        msg.innerHTML = '<span style="color:#22c55e">✓ ' + (res.message || 'Password Reset Successful') + '</span>';
+        setTimeout(() => {
+            closeForgotModal();
+            const lEmail = document.getElementById('l-email');
+            if(lEmail) lEmail.value = email;
+        }, 2000);
+    } catch(err) {
+        console.error("Forgot Confirm Error:", err);
+        const errMsg = (err.data && err.data.error) ? err.data.error : 'Reset failed.';
+        msg.innerHTML = '<span style="color:#ef4444">✗ ' + errMsg + '</span>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Reset Password';
+    }
+}
 
-            const formData = {
-                first_name: document.getElementById('reg-fname').value,
-                last_name: document.getElementById('reg-lname').value,
-                email: document.getElementById('reg-email').value,
-                username: document.getElementById('reg-username').value,
-                phone: document.getElementById('reg-phone').value,
-                password: document.getElementById('reg-password').value,
-                password2: document.getElementById('reg-password2').value,
-                state: document.getElementById('reg-state').value,
-                district: document.getElementById('reg-district').value,
-                village: document.getElementById('reg-village').value,
-            };
+if (isLoggedIn()) location.href = '/dashboard/';
 
-            try {
-                const data = await register(formData);
-                saveTokens(data.tokens);
-                saveUser(data.user);
-                pendingEmail = formData.email;
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let state = {
+    voter_id: '', email: '', voter_name: '',
+    voter_data: null,        // populated after OTP verified
+    first_name: '', last_name: '', username: '',
+    phone: '', village: '', district: '', state_: '', nation: 'India',
+    password: '', password2: '',
+};
+let currentQ   = 0;
+let prevQ      = -1;
+let otpSent    = false;
 
-                // Show OTP form
-                document.getElementById('register-form').classList.add('hidden');
-                document.getElementById('login-form').classList.add('hidden');
-                document.querySelector('.auth-tabs').classList.add('hidden');
-                document.getElementById('otp-form').classList.remove('hidden');
+/* ══════════════════════════════════════════
+   QUESTIONS DEFINITION
+══════════════════════════════════════════ */
+const Q = [
+    /* 0 */ {
+        id:'voter_id', icon:'🗳️',
+        title:'What is your Voter ID?',
+        hint:'As printed on your voter card (e.g. VID-MYTEST0001)',
+        type:'text', placeholder:'VID-XXXXXXXX', cls:'upper',
+        action: 'next',
+    },
+    /* 1 */ {
+        id:'email', icon:'📧',
+        title:'What is your registered email?',
+        hint:'The email linked to your Voter ID at the local election office.',
+        type:'email', placeholder:'you@example.com',
+        action: 'send-otp',   // checks voter roll + sends OTP
+        btnLabel: 'Send OTP →',
+    },
+    /* 2 */ {
+        id:'otp', icon:'🔢',
+        title:'Enter the OTP sent to your email',
+        hint:'Check your inbox — valid for 10 minutes.',
+        type:'text', placeholder:'• • • • • •', maxlen:6, cls:'otp',
+        action: 'verify-otp',
+        btnLabel: 'Verify OTP →',
+    },
+    /* 3 */ {
+        id:'first_name', icon:'👤',
+        title:'What is your first name?',
+        hint:'As it appears on your voter card.',
+        type:'text', placeholder:'First name',
+        action: 'next',
+    },
+    /* 4 */ {
+        id:'last_name', icon:'👤',
+        title:'And your last name?',
+        hint:'',
+        type:'text', placeholder:'Last name',
+        action: 'next',
+    },
+    /* 5 */ {
+        id:'username', icon:'🆔',
+        title:'Choose a username',
+        hint:'This is how you will log in to SecureVote.',
+        type:'text', placeholder:'e.g. rahul_sharma',
+        action: 'next',
+    },
+    /* 6 */ {
+        id:'phone', icon:'📱',
+        title:'Your phone number?',
+        hint:'Optional — used for SMS alerts.',
+        type:'tel', placeholder:'+91 9876543210',
+        action: 'next',
+        optional: true,
+    },
+    /* 7 */ {
+        id:'village', icon:'🏘️',
+        title:'What is your Village/City?',
+        hint:'The local area where you vote.',
+        type:'text', placeholder:'e.g. Bhatkal',
+        action: 'next',
+    },
+    /* 8 */ {
+        id:'district', icon:'🗺️',
+        title:'What is your District?',
+        hint:'The district of your constituency.',
+        type:'text', placeholder:'e.g. Uttara Kannada',
+        action: 'next',
+    },
+    /* 9 */ {
+        id:'state_', icon:'🏛️',
+        title:'What is your State?',
+        hint:'The state of your constituency.',
+        type:'text', placeholder:'e.g. Karnataka',
+        action: 'next',
+    },
+    /* 10 */ {
+        id:'nation', icon:'🇮🇳',
+        title:'What is your Nation?',
+        hint:'',
+        type:'text', placeholder:'e.g. India',
+        action: 'next',
+    },
+    /* 11 */ {
+        id:'password', icon:'🔐',
+        title:'Create a strong password',
+        hint:'Minimum 8 characters.',
+        type:'password', placeholder:'Min 8 characters', cls:'pass',
+        action: 'next',
+    },
+    /* 12 */ {
+        id:'password2', icon:'🔐',
+        title:'Confirm your password',
+        hint:'',
+        type:'password', placeholder:'Re-enter password', cls:'pass',
+        action: 'submit',
+        btnLabel: '🚀 Create Account',
+    },
+];
 
-                // Show mock OTP
-                if (data.mock_otp) {
-                    document.getElementById('mock-otp-display').textContent =
-                        `(Dev Mode) Your OTP is: ${data.mock_otp}`;
-                }
-            } catch (err) {
-                let msg = 'Registration failed.';
-                if (err.data) {
-                    const errors = Object.values(err.data).flat();
-                    msg = errors.join(' ');
-                }
-                document.getElementById('register-alert').innerHTML =
-                    `<div class="alert alert-error">✗ ${msg}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Create Account';
-            }
-        }
+/* ══════════════════════════════════════════
+   BUILD SLIDES
+══════════════════════════════════════════ */
+function buildSlides() {
+    const vp = document.getElementById('q-viewport');
+    vp.innerHTML = '';
+    Q.forEach((q, i) => {
+        const div = document.createElement('div');
+        div.className = 'q-slide';
+        div.id = `q-slide-${i}`;
+        const btnLabel = q.btnLabel || 'Next →';
+        const optText  = q.optional ? ' <span style="color:var(--text-muted,#888);font-weight:400">(optional)</span>' : '';
+        div.innerHTML = `
+            <div class="q-icon">${q.icon}</div>
+            <div class="q-title">${q.title}${optText}</div>
+            <div class="q-hint">${q.hint}</div>
+            <input
+                class="q-input${q.cls ? ' '+q.cls : ''}"
+                id="q-input-${i}"
+                type="${q.type}"
+                placeholder="${q.placeholder}"
+                ${q.maxlen ? `maxlength="${q.maxlen}"` : ''}
+                autocomplete="off"
+                spellcheck="false"
+            >
+            <div class="q-msg" id="q-msg-${i}"></div>
+            <div class="q-footer">
+                <button class="q-btn" id="q-btn-${i}" type="button" onclick="advance(${i})">
+                    ${btnLabel}
+                </button>
+                <span class="q-enter-hint">or press <kbd>Enter</kbd></span>
+            </div>`;
+        vp.appendChild(div);
 
-        async function handleOTP(e) {
-            e.preventDefault();
-            const code = document.getElementById('otp-code').value;
-
-            try {
-                await verifyOTP(pendingEmail, code);
-                const user = getUser();
-                if (user) { user.is_verified = true; saveUser(user); }
-                window.location.href = '/dashboard/';
-            } catch (err) {
-                document.getElementById('otp-alert').innerHTML =
-                    `<div class="alert alert-error">✗ ${err.data?.error || 'Invalid OTP.'}</div>`;
-            }
-        }
-    </script>
-    <script src="/static/js/translations.js"></script>
-    <script src="/static/js/translate.js"></script>
-    <script src="/static/js/voice.js"></script>
-    <script>
-        VoiceEngine.init({
-            announceOnLoad: 'Welcome to SecureVote. You can sign in or create a new account. Click the microphone button or say a command to get started.',
-            guideSteps: [
-                { text: 'Welcome to SecureVote — Secure Online Voting System.', speak: 'Welcome to SecureVote, a Secure Online Voting System.' },
-                { text: 'To login, enter your email and password, then click Sign In.', speak: 'To login, enter your email and password, then click Sign In. Or say login.' },
-                { text: 'To register, click the Register tab and fill in your details.', speak: 'To create a new account, click the Register tab or say register.' },
-                { text: 'You can use voice commands: say "login" or "register" to switch tabs.', speak: 'You can use voice commands. Say login or register to switch between the forms.' },
-                { text: 'After registering, you will receive an OTP to verify your account.', speak: 'After registering, you will receive a one-time password to verify your account.' },
-            ],
-            commands: [
-                {
-                    patterns: ['login', 'sign in', 'log in'],
-                    handler: () => { showTab('login'); VoiceEngine.speak('Switched to login form.'); },
-                    description: 'Switch to login tab'
-                },
-                {
-                    patterns: ['register', 'sign up', 'create account'],
-                    handler: () => { showTab('register'); VoiceEngine.speak('Switched to registration form.'); },
-                    description: 'Switch to register tab'
-                }
-            ]
+        // Enter key handler
+        div.querySelector(`#q-input-${i}`).addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); advance(i); }
         });
-    </script>
+    });
+}
+
+/* ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ */
+function showSlide(idx, direction = 'forward') {
+    // Exit current
+    if (prevQ >= 0) {
+        const old = document.getElementById(`q-slide-${prevQ}`);
+        if (old) { old.classList.add('exiting'); setTimeout(() => old.classList.remove('exiting','active'), 450); }
+    }
+    // Enter new
+    const el = document.getElementById(`q-slide-${idx}`);
+    if (!el) return;
+    if (direction === 'back') {
+        el.style.transform = 'translateX(-60px)';
+        el.style.opacity   = '0';
+        setTimeout(() => { el.style.transform=''; el.style.opacity=''; }, 10);
+    }
+    el.classList.add('active');
+    setTimeout(() => { const inp = document.getElementById(`q-input-${idx}`); if(inp && !inp.readOnly) inp.focus(); }, 450);
+
+    // Update progress
+    const total = Q.length;
+    const pct   = Math.round(((idx + 1) / total) * 100);
+    document.getElementById('prog-bar').style.width   = pct + '%';
+    document.getElementById('prog-label').textContent = `${idx + 1} / ${total}`;
+    document.getElementById('prog-back-btn').style.visibility = 'visible';
+
+    prevQ      = idx;
+    currentQ   = idx;
+}
+
+function goBack() {
+    if (currentQ <= 0) { switchTab('login'); return; }
+    const target = currentQ - 1;
+    const el = document.getElementById(`q-slide-${currentQ}`);
+    if (el) el.classList.remove('active');
+    prevQ = currentQ;
+    currentQ = target;
+    showSlide(target, 'back');
+}
+
+/* ══════════════════════════════════════════
+   ADVANCE (main logic)
+══════════════════════════════════════════ */
+async function advance(idx) {
+    const q    = Q[idx];
+    const inp  = document.getElementById(`q-input-${idx}`);
+    const msg  = document.getElementById(`q-msg-${idx}`);
+    const btn  = document.getElementById(`q-btn-${idx}`);
+    const val  = inp.value.trim();
+
+    msg.className = 'q-msg';
+    msg.textContent = '';
+
+    // Validation
+    if (!q.optional && !val) { shake(inp); setMsg(msg, 'Please fill this in.', 'err'); return; }
+    if (q.id === 'password' && val.length < 8) { setMsg(msg, 'Password must be at least 8 characters.', 'err'); return; }
+    if (q.id === 'password2' && val !== state.password) { setMsg(msg, 'Passwords do not match.', 'err'); return; }
+
+    // Save to state
+    const stateKey = q.id === 'state_' ? 'state_' : q.id;
+    state[q.id] = val;
+
+    // Action
+    if (q.action === 'next') {
+        moveNext();
+
+    } else if (q.action === 'send-otp') {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span> Checking voter roll…';
+        try {
+            const res = await sendVoterOTP(state.voter_id.toUpperCase(), val.toLowerCase());
+            if (res.sent) {
+                otpSent = true;
+                state.voter_name = res.voter_name;
+                setMsg(msg, `✓ OTP sent to ${res.masked_email}`, 'ok');
+                setTimeout(() => {
+                    moveNext();
+                    // Dev mode auto-fill
+                    if (res.dev_otp) {
+                        setTimeout(() => {
+                            const otpInput = document.getElementById(`q-input-${idx + 1}`);
+                            if (otpInput) {
+                                otpInput.value = res.dev_otp;
+                                setMsg(document.getElementById(`q-msg-${idx + 1}`), 'Auto-filled for Dev Mode', 'inf');
+                            }
+                        }, 500);
+                    }
+                }, 700);
+            } else {
+                setMsg(msg, res.error || 'You are not a voter.', 'err');
+            }
+        } catch(e) {
+            const err = e.data?.error || 'You are not a voter. Your details were not found in the village voter database.';
+            setMsg(msg, err, 'err');
+        }
+        btn.disabled = false;
+        btn.innerHTML = 'Send OTP →';
+
+    } else if (q.action === 'verify-otp') {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span> Verifying…';
+        try {
+            const res = await verifyVoterOTP(state.voter_id.toUpperCase(), state.email.toLowerCase(), val);
+            if (res.verified) {
+                state.voter_data = res.voter_data;
+                // pre-fill state from voter data
+                if (res.voter_data.full_name) {
+                    const parts = res.voter_data.full_name.split(' ');
+                    state.first_name = parts[0] || '';
+                    state.last_name  = parts.slice(1).join(' ') || '';
+                }
+                state.village  = res.voter_data.village  || '';
+                state.district = res.voter_data.district || '';
+                state.state_   = res.voter_data.state    || '';
+                state.nation   = res.voter_data.nation   || 'India';
+                if (res.voter_data.mobile_number) state.phone = res.voter_data.mobile_number;
+
+                // Show verified strip
+                document.getElementById('verified-strip').classList.remove('hidden');
+                document.getElementById('verified-name').textContent =
+                    `${state.voter_name} — ${state.village}, ${state.state_}`;
+
+                setMsg(msg, '✓ Email verified! Your voter data has been loaded.', 'ok');
+                setTimeout(() => { prefillFrom(3); moveNext(); }, 800);
+            } else {
+                setMsg(msg, res.error || 'Incorrect OTP.', 'err');
+            }
+        } catch(e) {
+            setMsg(msg, e.data?.error || 'Incorrect OTP. Try again.', 'err');
+        }
+        btn.disabled = false;
+        btn.innerHTML = 'Verify OTP →';
+
+    } else if (q.action === 'submit') {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span> Creating account…';
+        try {
+            const vd = state.voter_data || {};
+            const payload = {
+                voter_id:   state.voter_id.toUpperCase(),
+                email:      state.email.toLowerCase(),
+                first_name: state.first_name,
+                last_name:  state.last_name,
+                username:   state.username,
+                phone:      state.phone,
+                password:   state.password,
+                password2:  state.password2,
+                village:    vd.village  || state.village,
+                district:   vd.district || state.district,
+                state:      vd.state    || state.state_,
+            };
+            const res = await register(payload);
+            saveTokens(res.tokens);
+            saveUser(res.user);
+
+            // Show success
+            document.getElementById('reg-progressive').classList.add('hidden');
+            document.getElementById('reg-success').classList.remove('hidden');
+            document.getElementById('auth-tabs').classList.add('hidden');
+
+            if (res.already_verified) {
+                document.getElementById('success-msg').textContent = 'Email already verified. Redirecting to dashboard…';
+                setTimeout(() => location.href = '/dashboard/', 2000);
+            } else {
+                document.getElementById('success-msg').textContent =
+                    `A verification OTP has been sent to ${state.email}. Redirecting…`;
+                setTimeout(() => location.href = '/verify/', 2500);
+            }
+        } catch(e) {
+            const errObj = e.data || {};
+            const msg2 = errObj.error || Object.values(errObj).flat()[0] || 'Registration failed.';
+            setMsg(msg, msg2, 'err');
+            btn.disabled = false;
+            btn.innerHTML = '🚀 Create Account';
+        }
+    }
+}
+
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+function moveNext() {
+    const next = currentQ + 1;
+    if (next >= Q.length) return;
+    const cur = document.getElementById(`q-slide-${currentQ}`);
+    if (cur) cur.classList.remove('active');
+    prevQ = currentQ;
+    currentQ = next;
+    showSlide(next);
+}
+
+function prefillFrom(startIdx) {
+    // Pre-fill inputs from state after voter data is loaded
+    const map = { first_name:3, last_name:4, phone:6, village:7, district:8, state_:9, nation:10 };
+    for (const [key, idx] of Object.entries(map)) {
+        if (state[key]) {
+            const el = document.getElementById(`q-input-${idx}`);
+            if (el) el.value = state[key];
+        }
+    }
+}
+
+function setMsg(el, text, type) {
+    el.className = 'q-msg ' + type;
+    el.textContent = text;
+}
+
+function shake(el) {
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'shakeX .4s ease';
+    setTimeout(() => el.style.animation = '', 400);
+}
+
+/* ══════════════════════════════════════════
+   TAB SWITCHING
+══════════════════════════════════════════ */
+function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+    document.getElementById('reg-progressive').classList.toggle('hidden', tab !== 'register');
+    document.getElementById('reg-success').classList.add('hidden');
+    document.getElementById('auth-tabs').classList.remove('hidden');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+
+    if (tab === 'register' && currentQ === 0 && !document.getElementById('q-slide-0')) {
+        buildSlides();
+        showSlide(0);
+    }
+}
+
+/* ══════════════════════════════════════════
+   LOGIN
+══════════════════════════════════════════ */
+
+async function doLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Signing in…';
+    try {
+        const data = await login(
+            document.getElementById('l-email').value,
+            document.getElementById('l-pass').value
+        );
+        saveTokens(data.tokens); saveUser(data.user);
+        location.href = data.user.is_verified ? '/dashboard/' : '/verify/';
+    } catch(err) {
+        const msg = err.data?.non_field_errors?.[0] || err.data?.error || 'Login failed.';
+        document.getElementById('login-err').innerHTML = `<div class="alert alert-error">✗ ${msg}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+    }
+}
+
+/* ── Shake keyframe ── */
+const ks = document.createElement('style');
+ks.textContent = `@keyframes shakeX{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}`;
+document.head.appendChild(ks);
+</script>
+<script src="/static/js/translations.js"></script>
+<script src="/static/js/translate.js"></script>
+<script src="/static/js/voice.js"></script>
+<script>
+VoiceEngine.init({
+    announceOnLoad:'Welcome to SecureVote. Sign in or register to vote.',
+    guideSteps:[
+        {text:'Welcome to SecureVote.',speak:'Welcome to SecureVote, Secure Online Voting System.'},
+        {text:'To register, click Register and answer questions one by one.',speak:'To register, click the Register tab and answer each question one at a time. Start with your Voter ID.'},
+    ],
+    commands:[
+        {patterns:['login','sign in'],handler:()=>{switchTab('login');VoiceEngine.speak('Login form.');},description:'Login'},
+        {patterns:['register','sign up'],handler:()=>{switchTab('register');VoiceEngine.speak('Register form.');},description:'Register'},
+    ]
+});
+</script>
+    <div class="auth-footer">
+        Secure • Transparent • Democratic<br>
+        <a href="/admin-login/" style="color:var(--accent); text-decoration:none; font-size:0.85rem; margin-top:10px; display:inline-block;">Village Admin Portal</a>
+    </div>
+
+    <!-- ══ FORGOT PASSWORD MODAL ══ -->
+    <div id="forgot-modal" class="modal-overlay hidden" style="z-index:9999">
+        <div class="modal-content" style="max-width:400px; background: #fffcf5; border: 2px solid #e6d5c3; color: #4a2e24;">
+            <div class="modal-header" style="border-bottom: 1px solid #e6d5c3;">
+                <h2 style="color: #4a2e24; margin: 0;">Reset Password</h2>
+                <button class="close-btn" onclick="closeForgotModal()" style="color: #a38d82;">×</button>
+            </div>
+            <div id="forgot-step-1">
+                <p style="color: #7a5a4a; margin-bottom: 15px;">Enter your email to receive a reset OTP.</p>
+                <div class="form-group">
+                    <input type="email" class="form-input" id="f-email" placeholder="you@example.com" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                </div>
+                <button class="btn btn-primary" style="width:100%; margin-top: 15px;" onclick="handleForgotRequest()" id="forgot-req-btn">Send OTP →</button>
+            </div>
+            <div id="forgot-step-2" class="hidden">
+                <p style="color: #7a5a4a; margin-bottom: 15px;">Enter the OTP sent to your email and your new password.</p>
+                <div class="form-group">
+                    <label class="form-label" style="color: #4a2e24;">OTP</label>
+                    <input type="text" class="form-input" id="f-otp" placeholder="6-digit code" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label class="form-label" style="color: #4a2e24;">New Password</label>
+                    <input type="password" class="form-input" id="f-pass" placeholder="Min 8 characters" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                </div>
+                <button class="btn btn-primary" style="width:100%; margin-top: 15px;" onclick="handleForgotConfirm()" id="forgot-conf-btn">Reset Password</button>
+            </div>
+            <div id="forgot-msg" style="margin-top: 15px; text-align: center; font-size: 0.85rem;"></div>
+        </div>
+    </div>
 </body>
 </html>

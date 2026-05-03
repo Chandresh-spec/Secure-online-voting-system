@@ -1,34 +1,70 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, OTP, VoterVerification
+from .models import User, OTP, VoterVerification, VoterRoll, VillageAdmin
 
+class VoterRollSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VoterRoll
+        fields = '__all__'
+
+class VillageAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VillageAdmin
+        fields = '__all__'
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
+    voter_id = serializers.CharField(max_length=30, required=True)
 
     class Meta:
         model = User
         fields = [
             'email', 'username', 'password', 'password2',
             'first_name', 'last_name', 'phone',
-            'state', 'district', 'village', 'date_of_birth',
+            'voter_id', 'state', 'district', 'village', 'date_of_birth',
         ]
 
     def validate(self, data):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
+
+        # --- VoterRoll check ---
+        voter_id = data.get('voter_id', '').strip().upper()
+        email = data.get('email', '').strip().lower()
+        try:
+            roll = VoterRoll.objects.get(voter_id=voter_id, email=email)
+        except VoterRoll.DoesNotExist:
+            try:
+                roll = VillageAdmin.objects.get(admin_id=voter_id, email=email)
+            except VillageAdmin.DoesNotExist:
+                raise serializers.ValidationError({
+                    'voter_id': 'You are not a voter. Your Voter ID and Email were not found in the village database.'
+                })
+        if roll.is_registered:
+            raise serializers.ValidationError({
+                'voter_id': 'This Voter ID is already registered in the system.'
+            })
+        self._roll = roll
+        data['voter_id'] = voter_id
         return data
 
     def create(self, validated_data):
         validated_data.pop('password2')
         password = validated_data.pop('password')
-        # Generate voter_id
-        import uuid
-        validated_data['voter_id'] = f"VID-{uuid.uuid4().hex[:10].upper()}"
         user = User(**validated_data)
         user.set_password(password)
+        
+        # Apply role and permissions from VoterRoll/VillageAdmin
+        user.role = getattr(self._roll, 'designated_role', 'voter')
+        if user.role == 'admin':
+            user.is_staff = True
+            user.is_superuser = True
+            
         user.save()
+        # Mark this roll entry as registered
+        self._roll.is_registered = True
+        self._roll.save()
         return user
 
 

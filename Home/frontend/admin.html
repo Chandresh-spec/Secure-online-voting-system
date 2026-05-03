@@ -1,221 +1,667 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureVote — Admin Panel</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/translate.css">
-    <link rel="stylesheet" href="/static/css/voice.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureVote — Village Admin Panel</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+.admin-header{background:linear-gradient(135deg,rgba(108,99,255,.1),rgba(16,185,129,.1));border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;display:flex;align-items:center;gap:20px}
+.admin-icon{font-size:3rem;background:rgba(255,255,255,.1);padding:16px;border-radius:16px}
+.admin-title h1{margin-bottom:4px;font-size:1.8rem}.admin-title p{color:var(--text-muted);font-size:1rem}
+.tabs-header{display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:10px}
+.tab-btn{background:transparent;color:var(--text-muted);border:none;padding:10px 20px;border-radius:8px;font-size:1rem;cursor:pointer;transition:.2s;font-weight:600}
+.tab-btn.active{background:linear-gradient(135deg,#6C63FF,#4F46E5);color:#fff}
+.tab-btn:hover:not(.active){background:rgba(255,255,255,.05)}
+.tab-content{display:none}.tab-content.active{display:block;animation:fadeIn .3s}
+.action-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.badge-bool.true{background:rgba(16,185,129,.2);color:#10B981}.badge-bool.false{background:rgba(239,68,68,.2);color:#EF4444}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+.modal.active{display:flex}
+.modal-content{background:#1A1A24;border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:1.2rem;font-weight:bold}
+.close-btn{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer}
+.face-box{width:240px;height:240px;margin:12px auto;border-radius:16px;overflow:hidden;background:#111;border:2px solid var(--border)}
+.face-box video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+
+/* Liveness Check CSS */
+.face-auth-container { position: relative; width: 250px; height: 330px; margin: 20px auto; border-radius: 50%; overflow: hidden; background: #111; box-shadow: 0 0 0 6px var(--border), 0 0 20px rgba(0,0,0,0.5); transition: box-shadow 0.3s ease; display: flex; justify-content: center; align-items: center; }
+.face-auth-container.active { box-shadow: 0 0 0 6px var(--accent), 0 0 30px rgba(79, 70, 229, 0.4); }
+.face-auth-container.success { box-shadow: 0 0 0 6px var(--success), 0 0 30px rgba(16, 185, 129, 0.6); }
+.face-auth-container.error { box-shadow: 0 0 0 6px var(--danger), 0 0 30px rgba(239, 68, 68, 0.6); }
+.scanner-line { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: var(--accent-light); box-shadow: 0 0 15px var(--accent-light); animation: scan 2s infinite linear; z-index: 10; display: none; }
+.face-auth-container.active .scanner-line { display: block; }
+@keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+.live-status { font-size: 1.25rem; font-weight: 600; color: var(--text); margin: 10px 0; min-height: 30px; transition: color 0.3s ease; text-align: center; }
+.liveness-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+.dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.dot.passed { background: var(--success); }
+#el-webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spinR .7s linear infinite;vertical-align:middle;margin-right:5px}
+@keyframes spinR{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
-    <nav class="navbar"><div class="container">
-        <a href="/dashboard/" class="nav-brand"><div class="logo">🗳️</div> SecureVote Admin</a>
-        <ul class="nav-links">
-            <li><a href="/dashboard/">Dashboard</a></li>
-            <li><a href="/elections/">Elections</a></li>
-            <li><a href="/admin-panel/" class="active">Admin</a></li>
-        </ul>
-        <div class="nav-user">
-            <span class="user-name" id="user-display"></span>
-            <button class="btn btn-sm btn-secondary" onclick="clearAuth();location='/'">Logout</button>
-        </div>
-    </div></nav>
+<nav class="navbar"><div class="container">
+    <a href="/admin-panel/" class="nav-brand"><div class="logo">🛡️</div> SecureVote Admin</a>
+    <div class="nav-user">
+        <span class="user-name" id="user-display"></span>
+        <button class="btn btn-sm btn-secondary" onclick="clearAuth();location='/admin-login/'">Logout</button>
+    </div>
+</div></nav>
 
-    <div class="container">
-        <div class="page-header">
-            <div class="section-header">
-                <div><h1 class="section-title">Admin Panel</h1><p class="section-subtitle">Manage elections, users, and view analytics</p></div>
-            </div>
-        </div>
-
-        <!-- Stats -->
-        <div class="stats-grid" id="admin-stats">
-            <div class="stat-card"><div class="stat-icon purple">👥</div><div><div class="stat-value" id="s-users">—</div><div class="stat-label">Total Users</div></div></div>
-            <div class="stat-card"><div class="stat-icon green">✓</div><div><div class="stat-value" id="s-verified">—</div><div class="stat-label">Verified</div></div></div>
-            <div class="stat-card"><div class="stat-icon blue">🗳️</div><div><div class="stat-value" id="s-elections">—</div><div class="stat-label">Elections</div></div></div>
-            <div class="stat-card"><div class="stat-icon orange">📊</div><div><div class="stat-value" id="s-votes">—</div><div class="stat-label">Total Votes</div></div></div>
-        </div>
-
-        <!-- Create Election -->
-        <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">➕ Create Election</h3></div>
-            <form onsubmit="handleCreateElection(event)">
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="el-title" required></div>
-                    <div class="form-group"><label class="form-label">Level</label>
-                        <select class="form-input" id="el-level" required>
-                            <option value="national">National</option>
-                            <option value="state">State</option>
-                            <option value="village">Village</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="el-desc" rows="2"></textarea></div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Constituency</label><input class="form-input" id="el-cons"></div>
-                    <div class="form-group"><label class="form-label">State</label><input class="form-input" id="el-state"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">District</label><input class="form-input" id="el-district"></div>
-                    <div class="form-group"><label class="form-label">Village</label><input class="form-input" id="el-village"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Start Time</label><input type="datetime-local" class="form-input" id="el-start" required></div>
-                    <div class="form-group"><label class="form-label">End Time</label><input type="datetime-local" class="form-input" id="el-end" required></div>
-                </div>
-                <button type="submit" class="btn btn-primary">Create Election</button>
-            </form>
-        </div>
-
-        <!-- Add Candidate -->
-        <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">👤 Add Candidate</h3></div>
-            <form onsubmit="handleAddCandidate(event)">
-                <div class="form-group"><label class="form-label">Election</label>
-                    <select class="form-input" id="cand-election" required><option value="">Select election...</option></select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Candidate Name</label><input class="form-input" id="cand-name" required></div>
-                    <div class="form-group"><label class="form-label">Party</label><input class="form-input" id="cand-party" required></div>
-                </div>
-                <div class="form-group"><label class="form-label">Symbol (emoji)</label><input class="form-input" id="cand-symbol" placeholder="🌸"></div>
-                <button type="submit" class="btn btn-primary">Add Candidate</button>
-            </form>
-        </div>
-
-        <!-- Users Table -->
-        <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">👥 Users</h3></div>
-            <div class="table-wrapper"><table>
-                <thead><tr><th>Name</th><th>Email</th><th>Voter ID</th><th>Role</th><th>State</th><th>Verified</th></tr></thead>
-                <tbody id="users-tbody"><tr><td colspan="6" class="text-center"><div class="spinner"></div></td></tr></tbody>
-            </table></div>
-        </div>
-
-        <!-- Elections Table -->
-        <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">🗳️ All Elections</h3></div>
-            <div class="table-wrapper"><table>
-                <thead><tr><th>Title</th><th>Level</th><th>Status</th><th>Start</th><th>End</th><th>Actions</th></tr></thead>
-                <tbody id="elections-tbody"><tr><td colspan="6" class="text-center"><div class="spinner"></div></td></tr></tbody>
-            </table></div>
+<div class="container">
+    <div class="admin-header">
+        <div class="admin-icon">🏘️</div>
+        <div class="admin-title">
+            <h1>Village Admin Dashboard</h1>
+            <p>Managing elections and voters for <strong id="admin-village-name" class="text-primary">Loading...</strong></p>
         </div>
     </div>
 
-    <script src="/static/js/api.js"></script>
-    <script>
-    if(!requireAuth()){}
-    const user=getUser();
-    document.getElementById('user-display').textContent=user?.first_name||'';
+    <div class="stats-grid mb-3">
+        <div class="stat-card"><div class="stat-icon blue">📋</div><div><div class="stat-value" id="stat-roll">—</div><div class="stat-label">Voter Roll</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">✓</div><div><div class="stat-value" id="stat-registered">—</div><div class="stat-label">Registered</div></div></div>
+        <div class="stat-card"><div class="stat-icon purple">🗳️</div><div><div class="stat-value" id="stat-elections">—</div><div class="stat-label">Elections</div></div></div>
+    </div>
 
-    async function loadAdmin(){
-        // Stats
-        try{
-            const s=await getDashboardStats();
-            document.getElementById('s-users').textContent=s.total_users;
-            document.getElementById('s-verified').textContent=s.verified_users;
-            document.getElementById('s-elections').textContent=s.total_elections;
-            document.getElementById('s-votes').textContent=s.total_votes;
-        }catch(e){console.error(e);}
+    <!-- Tabs -->
+    <div class="tabs-header">
+        <button class="tab-btn active" onclick="switchTab('voters',this)">👥 Manage Voters</button>
+        <button class="tab-btn" onclick="switchTab('elections',this)">🗳️ Manage Elections</button>
+    </div>
 
-        // Users
-        try{
-            const d=await getUsers();const users=d.results||d;
-            document.getElementById('users-tbody').innerHTML=users.map(u=>
-                `<tr><td>${u.first_name} ${u.last_name}</td><td>${u.email}</td><td>${u.voter_id||'—'}</td><td><span class="badge badge-${u.role}">${u.role}</span></td><td>${u.state||'—'}</td><td>${u.is_verified?'<span class="badge badge-verified">Yes</span>':'No'}</td></tr>`
-            ).join('')||'<tr><td colspan="6" class="text-muted">No users</td></tr>';
-        }catch(e){document.getElementById('users-tbody').innerHTML='<tr><td colspan="6" class="text-muted">Access denied or error</td></tr>';}
+    <!-- VOTERS TAB -->
+    <div id="tab-voters" class="tab-content active">
+        <div class="card">
+            <div class="action-bar">
+                <h3 class="card-title">Village Voter Roll</h3>
+                <button class="btn btn-primary btn-sm" onclick="openModal('add-voter-modal')">➕ Add Voter</button>
+            </div>
+            <div style="margin-bottom:14px">
+                <input type="text" id="voter-search" class="form-input" placeholder="🔍 Search by name, voter ID, or email..." oninput="filterVoters()" style="max-width:400px">
+            </div>
+            <div class="table-wrapper"><table><thead><tr><th>Voter ID</th><th>Full Name</th><th>Email</th><th>Village</th><th>Registered</th><th>Actions</th></tr></thead>
+            <tbody id="roll-tbody"><tr><td colspan="6" class="text-center"><div class="spinner"></div></td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- ELECTIONS TAB -->
+    <div id="tab-elections" class="tab-content">
+        <div class="card mb-3">
+            <div class="action-bar">
+                <h3 class="card-title">Village Elections</h3>
+                <button class="btn btn-primary btn-sm" onclick="openElectionForm()">➕ Create Election</button>
+            </div>
+            <div style="margin-bottom:14px">
+                <input type="text" id="election-search" class="form-input" placeholder="🔍 Search elections by title or status..." oninput="filterElections()" style="max-width:400px">
+            </div>
+            <div class="table-wrapper"><table><thead><tr><th>Title</th><th>Status</th><th>Start</th><th>End</th><th>Actions</th></tr></thead>
+            <tbody id="elections-tbody"><tr><td colspan="5" class="text-center"><div class="spinner"></div></td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="action-bar"><h3 class="card-title">Add Candidates</h3></div>
+            <form onsubmit="handleAddCandidate(event)">
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Election</label><select class="form-input" id="cand-election" required><option value="">Select...</option></select></div>
+                    <div class="form-group"><label class="form-label">Candidate Name</label><input class="form-input" id="cand-name" required placeholder="Rahul Sharma"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Party</label><input class="form-input" id="cand-party" required placeholder="Independent"></div>
+                    <div class="form-group"><label class="form-label">Symbol</label><input class="form-input" id="cand-symbol" placeholder="🌸"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Candidate Photo</label><input type="file" class="form-input" id="cand-photo" accept="image/*"></div>
+                    <div class="form-group"><label class="form-label">Party Logo</label><input type="file" class="form-input" id="cand-party-photo" accept="image/*"></div>
+                </div>
+                <button type="submit" class="btn btn-secondary">Add Candidate</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ADD VOTER MODAL -->
+<div class="modal" id="add-voter-modal"><div class="modal-content">
+    <div class="modal-header"><div class="modal-title">➕ Add Voter</div><button class="close-btn" onclick="closeModal('add-voter-modal')">&times;</button></div>
+    <form onsubmit="handleAddVoter(event)">
+        <div class="form-group"><label class="form-label">Voter ID</label><input type="text" id="vr-id" class="form-input" required placeholder="VID-XXXXXXXX"></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="vr-name" class="form-input" required placeholder="John Doe"></div>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" id="vr-email" class="form-input" required placeholder="voter@example.com"></div>
+        <div class="form-group"><label class="form-label">Mobile</label><input type="tel" id="vr-mobile" class="form-input" placeholder="+91 9876543210"></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Village</label><input type="text" id="vr-village" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">District</label><input type="text" id="vr-district" class="form-input" required></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">State</label><input type="text" id="vr-state" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Nation</label><input type="text" id="vr-nation" class="form-input" required value="India"></div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Add Voter</button>
+    </form>
+</div></div>
+
+<!-- VIEW VOTER MODAL -->
+<div class="modal" id="view-voter-modal"><div class="modal-content">
+    <div class="modal-header"><div class="modal-title">👤 Voter Details</div><button class="close-btn" onclick="closeModal('view-voter-modal')">&times;</button></div>
+    <div id="view-voter-body" style="line-height:2"></div>
+</div></div>
+
+<!-- EDIT VOTER MODAL -->
+<div class="modal" id="edit-voter-modal"><div class="modal-content">
+    <div class="modal-header"><div class="modal-title">✏️ Edit Voter</div><button class="close-btn" onclick="closeModal('edit-voter-modal')">&times;</button></div>
+    <form onsubmit="handleUpdateVoter(event)">
+        <input type="hidden" id="ed-pk">
+        <div class="form-group"><label class="form-label">Voter ID</label><input type="text" id="ed-id" class="form-input" readonly style="opacity:.6"></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="ed-name" class="form-input" required></div>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" id="ed-email" class="form-input" required></div>
+        <div class="form-group"><label class="form-label">Mobile</label><input type="tel" id="ed-mobile" class="form-input"></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Village</label><input type="text" id="ed-village" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">District</label><input type="text" id="ed-district" class="form-input" required></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">State</label><input type="text" id="ed-state" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Nation</label><input type="text" id="ed-nation" class="form-input" required></div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Save Changes</button>
+    </form>
+</div></div>
+
+<!-- CREATE ELECTION MODAL (with face verification) -->
+<div class="modal" id="add-election-modal"><div class="modal-content">
+    <div class="modal-header"><div class="modal-title">Create Election</div><button class="close-btn" onclick="closeElectionModal()">&times;</button></div>
+
+    <!-- Step 1: Face Verify (Temporarily Disabled) -->
+    <div id="el-step-face" style="text-align:center; display:none;">
+        <p class="text-muted" style="margin-bottom:12px; font-size:0.9rem">🔒 <strong>Identity check required.</strong> Verify your face before creating an election.</p>
+        
+        <div class="face-auth-container" id="auth-container">
+            <div class="scanner-line"></div>
+            <video id="el-webcam" autoplay playsinline></video>
+            <canvas id="el-canvas" style="display:none"></canvas>
+        </div>
+
+        <div class="live-status" id="live-status-text">Click Start Verification</div>
+        
+        <div class="liveness-dots" id="liveness-dots" style="display:none;">
+            <div class="dot" id="dot-1"></div>
+            <div class="dot" id="dot-2"></div>
+            <div class="dot" id="dot-3"></div>
+        </div>
+        
+        <div id="el-face-msg" class="alert hidden" style="margin-bottom:15px; font-size:0.85rem"></div>
+
+        <button class="btn btn-primary" id="start-verification-btn" onclick="startAdminLivenessCheck()">Start Verification</button>
+    </div>
+
+    <!-- Step 2: Election Form -->
+    <div id="el-step-form" style="display:block">
+        <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:.85rem;color:#10B981;font-weight:600;display:none;">✅ Face verified! You may now create an election.</div>
+        <form onsubmit="handleCreateElection(event)">
+            <div class="form-group"><label class="form-label">Election Title</label><input type="text" id="el-title" class="form-input" required placeholder="Village Panchayat 2026"></div>
+            <div class="form-group"><label class="form-label">Description</label><textarea id="el-desc" class="form-input" rows="2" placeholder="Brief details"></textarea></div>
+            <div class="form-group"><label class="form-label">Level</label>
+                <select id="el-level" class="form-input" required onchange="toggleLevelFields()">
+                    <option value="village">🏘️ Village</option><option value="state">🏛️ State</option><option value="national">🇮🇳 National</option>
+                </select>
+            </div>
+            <div id="level-fields-village" class="form-row">
+                <div class="form-group"><label class="form-label">Village</label><input type="text" id="el-village" class="form-input"></div>
+                <div class="form-group"><label class="form-label">State</label><input type="text" id="el-state-village" class="form-input"></div>
+            </div>
+            <div id="level-fields-state" class="form-group" style="display:none"><label class="form-label">State</label><input type="text" id="el-state" class="form-input"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Start Time</label><input type="datetime-local" id="el-start" class="form-input" required></div>
+                <div class="form-group"><label class="form-label">End Time</label><input type="datetime-local" id="el-end" class="form-input" required></div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-2">Create Election</button>
+        </form>
+    </div>
+<!-- EDIT ELECTION MODAL -->
+<div class="modal" id="edit-election-modal"><div class="modal-content">
+    <div class="modal-header"><div class="modal-title">✏️ Edit Election</div><button class="close-btn" onclick="closeModal('edit-election-modal')">&times;</button></div>
+    <form onsubmit="handleUpdateElection(event)">
+        <input type="hidden" id="ed-el-id">
+        <div class="form-group"><label class="form-label">Election Title</label><input type="text" id="ed-el-title" class="form-input" required></div>
+        <div class="form-group"><label class="form-label">Status</label>
+            <select id="ed-el-status" class="form-input" required>
+                <option value="upcoming">Upcoming</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Start Time</label><input type="datetime-local" id="ed-el-start" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">End Time</label><input type="datetime-local" id="ed-el-end" class="form-input" required></div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Save Changes</button>
+    </form>
+</div></div>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="/static/js/api.js"></script>
+<script>
+    /* ── AUTH GUARD ── */
+    if (!isLoggedIn()) { location.href = '/admin-login/'; }
+    const user = getUser();
+    if (!user || (user.role !== 'admin' && user.role !== 'officer')) { alert('Access Denied'); location.href = '/admin-login/'; }
+
+    document.getElementById('user-display').textContent = user.first_name || 'Admin';
+    document.getElementById('admin-village-name').textContent = user.village ? `${user.village}, ${user.district}` : 'Unknown';
+
+    /* ── UI HELPERS ── */
+    function switchTab(id, btn) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-${id}`).classList.add('active');
+        btn.classList.add('active');
+    }
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    let elCamStream = null;
+    
+    // Temporarily bypasses face verification
+    function openElectionForm() {
+        document.getElementById('el-step-face').style.display = 'none';
+        document.getElementById('el-step-form').style.display = 'block';
+        prefillLocationFields();
+        openModal('add-election-modal');
+    }
+
+    function closeElectionModal() {
+        if (elCamStream) { elCamStream.getTracks().forEach(t => t.stop()); elCamStream = null; }
+        // document.getElementById('el-step-face').style.display = 'block';
+        // document.getElementById('el-step-form').style.display = 'none';
+        document.getElementById('el-face-msg').textContent = '';
+        closeModal('add-election-modal');
+    }
+
+    /* ── VOTER DATA CACHE ── */
+    let voterCache = [];
+
+    /* ── ELECTION DATA CACHE ── */
+    let electionCache = [];
+
+    /* ── LOAD DATA ── */
+    async function loadAdminData() {
+        // Voters
+        try {
+            const roll = await getVoterRoll();
+            voterCache = roll;
+            document.getElementById('stat-roll').textContent = roll.length || 0;
+            document.getElementById('stat-registered').textContent = roll.filter(v => v.is_registered).length || 0;
+            renderVoterTable(roll);
+        } catch(e) { console.error(e); }
 
         // Elections
-        try{
-            const d=await getElections();const els=d.results||d;
-            document.getElementById('elections-tbody').innerHTML=els.map(e=>
-                `<tr><td>${e.title}</td><td><span class="election-level ${e.level}">${e.level}</span></td><td><span class="election-status ${e.status}">${e.status}</span></td><td>${formatDate(e.start_time)}</td><td>${formatDate(e.end_time)}</td><td><button class="btn btn-sm btn-secondary" onclick="deleteEl('${e.id}')">Delete</button></td></tr>`
-            ).join('')||'<tr><td colspan="6" class="text-muted">No elections</td></tr>';
-
-            // Populate candidate dropdown
-            const sel=document.getElementById('cand-election');
-            els.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.title;sel.appendChild(o);});
-        }catch(e){document.getElementById('elections-tbody').innerHTML='<tr><td colspan="6" class="text-muted">Error</td></tr>';}
+        try {
+            const d = await getElections();
+            const all = d.results || d;
+            // Relaxed filtering so you can see elections even if village names don't exactly match
+            const ve = all.filter(e => e.level === 'village');
+            electionCache = ve;
+            document.getElementById('stat-elections').textContent = ve.length || 0;
+            renderElectionTable(ve);
+            
+            const sel = document.getElementById('cand-election');
+            sel.innerHTML = '<option value="">Select...</option>';
+            ve.forEach(e => { const o = document.createElement('option'); o.value = e.id; o.textContent = e.title; sel.appendChild(o); });
+        } catch(e) { console.error(e); }
     }
 
-    async function handleCreateElection(ev){
-        ev.preventDefault();
-        try{
-            await createElection({
-                title:document.getElementById('el-title').value,
-                description:document.getElementById('el-desc').value,
-                level:document.getElementById('el-level').value,
-                constituency:document.getElementById('el-cons').value,
-                state:document.getElementById('el-state').value,
-                district:document.getElementById('el-district').value,
-                village:document.getElementById('el-village').value,
-                start_time:new Date(document.getElementById('el-start').value).toISOString(),
-                end_time:new Date(document.getElementById('el-end').value).toISOString(),
-                status:'active',
+    /* ── RENDER ELECTION TABLE ── */
+    function renderElectionTable(list) {
+        const et = document.getElementById('elections-tbody');
+        if (!list.length) { et.innerHTML = '<tr><td colspan="5" class="text-muted text-center">No elections yet.</td></tr>'; return; }
+        et.innerHTML = list.map(e => `<tr>
+            <td><strong>${e.title}</strong></td>
+            <td><span class="election-status ${e.status}">${e.status}</span></td>
+            <td>${formatDate(e.start_time)}</td><td>${formatDate(e.end_time)}</td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-sm btn-secondary" onclick="editElection('${e.id}')" title="Edit">✏️</button>
+                <button class="btn btn-sm btn-secondary" style="color:var(--error)" onclick="deleteEl('${e.id}')" title="Destroy">🗑️</button>
+            </td>
+        </tr>`).join('');
+    }
+
+    /* ── SEARCH / FILTER ELECTIONS ── */
+    function filterElections() {
+        const q = document.getElementById('election-search').value.toLowerCase().trim();
+        if (!q) { renderElectionTable(electionCache); return; }
+        const filtered = electionCache.filter(e =>
+            e.title.toLowerCase().includes(q) ||
+            e.status.toLowerCase().includes(q)
+        );
+        renderElectionTable(filtered);
+    }
+
+    /* ── RENDER VOTER TABLE ── */
+    function renderVoterTable(list) {
+        const tb = document.getElementById('roll-tbody');
+        if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No voters found.</td></tr>'; return; }
+        tb.innerHTML = list.map(v => `<tr>
+            <td><strong>${v.voter_id}</strong></td><td>${v.full_name}</td><td>${v.email}</td>
+            <td>${v.village||''}</td>
+            <td><span class="badge badge-bool ${v.is_registered}">${v.is_registered?'Yes':'No'}</span></td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-sm btn-secondary" onclick="viewVoter(${v.id})" title="View">👁️</button>
+                <button class="btn btn-sm btn-secondary" onclick="editVoter(${v.id})" title="Edit">✏️</button>
+                <button class="btn btn-sm btn-secondary" style="color:var(--error)" onclick="deleteVoter(${v.id})" title="Delete">🗑️</button>
+            </td>
+        </tr>`).join('');
+    }
+
+    /* ── SEARCH / FILTER ── */
+    function filterVoters() {
+        const q = document.getElementById('voter-search').value.toLowerCase().trim();
+        if (!q) { renderVoterTable(voterCache); return; }
+        const filtered = voterCache.filter(v =>
+            v.voter_id.toLowerCase().includes(q) ||
+            v.full_name.toLowerCase().includes(q) ||
+            v.email.toLowerCase().includes(q)
+        );
+        renderVoterTable(filtered);
+    }
+
+    /* ── VIEW VOTER ── */
+    function viewVoter(id) {
+        const v = voterCache.find(x => x.id === id);
+        if (!v) { showToast('Voter not found', 'error'); return; }
+        document.getElementById('view-voter-body').innerHTML = `
+            <p><strong>Voter ID:</strong> ${v.voter_id}</p>
+            <p><strong>Full Name:</strong> ${v.full_name}</p>
+            <p><strong>Email:</strong> ${v.email}</p>
+            <p><strong>Mobile:</strong> ${v.mobile_number || '—'}</p>
+            <p><strong>Village:</strong> ${v.village}</p>
+            <p><strong>District:</strong> ${v.district || '—'}</p>
+            <p><strong>State:</strong> ${v.state}</p>
+            <p><strong>Nation:</strong> ${v.nation}</p>
+            <p><strong>Registered:</strong> <span class="badge badge-bool ${v.is_registered}">${v.is_registered ? 'Yes' : 'No'}</span></p>
+            <p><strong>Added:</strong> ${formatDate(v.created_at)}</p>
+        `;
+        openModal('view-voter-modal');
+    }
+
+    /* ── EDIT VOTER ── */
+    function editVoter(id) {
+        const v = voterCache.find(x => x.id === id);
+        if (!v) { showToast('Voter not found', 'error'); return; }
+        document.getElementById('ed-pk').value = v.id;
+        document.getElementById('ed-id').value = v.voter_id;
+        document.getElementById('ed-name').value = v.full_name;
+        document.getElementById('ed-email').value = v.email;
+        document.getElementById('ed-mobile').value = v.mobile_number || '';
+        document.getElementById('ed-village').value = v.village;
+        document.getElementById('ed-district').value = v.district || '';
+        document.getElementById('ed-state').value = v.state;
+        document.getElementById('ed-nation').value = v.nation;
+        openModal('edit-voter-modal');
+    }
+    async function handleUpdateVoter(ev) {
+        ev.preventDefault(); const btn = ev.target.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Saving...';
+        try {
+            await updateVoterRoll(document.getElementById('ed-pk').value, {
+                full_name: document.getElementById('ed-name').value,
+                email: document.getElementById('ed-email').value,
+                mobile_number: document.getElementById('ed-mobile').value,
+                village: document.getElementById('ed-village').value,
+                district: document.getElementById('ed-district').value,
+                state: document.getElementById('ed-state').value,
+                nation: document.getElementById('ed-nation').value,
             });
-            showToast('Election created!');ev.target.reset();loadAdmin();
-        }catch(e){showToast(JSON.stringify(e.data)||'Error','error');}
+            showToast('Voter updated!'); closeModal('edit-voter-modal'); loadAdminData();
+        } catch(e) { showToast(e.data?.email?.[0] || 'Error updating voter', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
     }
 
-    async function handleAddCandidate(ev){
-        ev.preventDefault();
-        try{
-            await createCandidate({
-                election:document.getElementById('cand-election').value,
-                name:document.getElementById('cand-name').value,
-                party:document.getElementById('cand-party').value,
-                symbol:document.getElementById('cand-symbol').value,
-            });
-            showToast('Candidate added!');ev.target.reset();
-        }catch(e){showToast(JSON.stringify(e.data)||'Error','error');}
+    /* ── VOTER CRUD ── */
+    async function handleAddVoter(ev) {
+        ev.preventDefault(); const btn = ev.target.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Adding...';
+        try {
+            await createVoterRoll({ voter_id: document.getElementById('vr-id').value.toUpperCase(), full_name: document.getElementById('vr-name').value, email: document.getElementById('vr-email').value, mobile_number: document.getElementById('vr-mobile').value, village: document.getElementById('vr-village').value, district: document.getElementById('vr-district').value, state: document.getElementById('vr-state').value, nation: document.getElementById('vr-nation').value });
+            showToast('Voter added!'); ev.target.reset(); closeModal('add-voter-modal'); loadAdminData();
+        } catch(e) { showToast(e.data?.voter_id?.[0] || e.data?.email?.[0] || 'Error', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Add Voter'; }
+    }
+    async function deleteVoter(id) {
+        if (!confirm('Remove this voter from the roll? They will not be able to register or vote.')) return;
+        try { await deleteVoterRoll(id); showToast('Voter removed.'); loadAdminData(); } catch(e) { showToast('Error', 'error'); }
     }
 
-    async function deleteEl(id){
-        if(!confirm('Delete this election?'))return;
-        try{await deleteElection(id);showToast('Deleted');loadAdmin();}
-        catch(e){showToast('Error','error');}
+    /* ── FACE VERIFICATION FOR ELECTION ── */
+    let faceMesh = null;
+    let livenessState = 'INIT';
+
+    function setStatus(text, color) {
+        const el = document.getElementById('live-status-text');
+        el.textContent = text; el.style.color = color;
+    }
+    function setDot(index, state) {
+        document.getElementById(`dot-${index}`).className = `dot ${state}`;
     }
 
-    loadAdmin();
-    </script>
-    <script src="/static/js/translations.js"></script>
-    <script src="/static/js/translate.js"></script>
-    <script src="/static/js/voice.js"></script>
-    <script>
-        VoiceEngine.init({
-            guideSteps: [
-                { text: 'This is the Admin Panel for managing the voting system.', speak: 'Welcome to the Admin Panel. From here you can manage elections, candidates, and view analytics.' },
-                {
-                    text: 'View system statistics: total users, verified users, elections, and votes.',
-                    speak: '',
-                    action: () => {
-                        const users = document.getElementById('s-users')?.textContent || '0';
-                        const verified = document.getElementById('s-verified')?.textContent || '0';
-                        const elections = document.getElementById('s-elections')?.textContent || '0';
-                        const votes = document.getElementById('s-votes')?.textContent || '0';
-                        setTimeout(() => VoiceEngine.speak(`System stats: ${users} total users, ${verified} verified, ${elections} elections, and ${votes} total votes cast.`), 500);
-                    }
-                },
-                { text: 'Create Election form lets you set up new elections with title, level, dates.', speak: 'You can create new elections by filling in the title, level, constituency, and start and end dates.' },
-                { text: 'Add Candidate form lets you add candidates to existing elections.', speak: 'Use the Add Candidate form to add candidates with their name, party, and symbol to any election.' },
-                { text: 'The Users and Elections tables show all registered data.', speak: 'Below you can see tables of all registered users and all elections in the system.' },
-            ],
-            commands: [
-                {
-                    patterns: ['read stats', 'show stats', 'system stats', 'analytics'],
-                    handler: () => {
-                        const users = document.getElementById('s-users')?.textContent || '0';
-                        const verified = document.getElementById('s-verified')?.textContent || '0';
-                        const elections = document.getElementById('s-elections')?.textContent || '0';
-                        const votes = document.getElementById('s-votes')?.textContent || '0';
-                        VoiceEngine.speak(`System stats: ${users} total users, ${verified} verified, ${elections} elections, and ${votes} total votes cast.`);
-                    },
-                    description: 'Read admin statistics'
+    function initMediaPipe(videoElement) {
+        if (typeof FaceMesh === 'undefined' || typeof Camera === 'undefined') {
+            setStatus("Library Load Error", "var(--danger)"); return;
+        }
+        if (faceMesh) return;
+        
+        faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        faceMesh.onResults(onFaceMeshResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                if (livenessState !== 'VERIFYING' && livenessState !== 'SUCCESS') {
+                    try { await faceMesh.send({image: videoElement}); } catch (e) {}
                 }
-            ]
+            },
+            width: 640, height: 480
         });
-    </script>
+        camera.start();
+    }
+
+    async function startAdminLivenessCheck() {
+        document.getElementById('start-verification-btn').style.display = "none";
+        document.getElementById('auth-container').className = "face-auth-container active";
+        document.getElementById('liveness-dots').style.display = "flex";
+        
+        if (!elCamStream) {
+            try {
+                elCamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const videoEl = document.getElementById('el-webcam');
+                videoEl.srcObject = elCamStream;
+                await new Promise(resolve => { videoEl.onloadedmetadata = resolve; });
+                videoEl.play();
+                initMediaPipe(videoEl);
+            } catch(e) {
+                setStatus("Camera Error", "var(--danger)"); return;
+            }
+        }
+        
+        livenessState = 'ALIGN';
+        setStatus("Detecting Face...", "var(--accent-light)");
+        setDot(1, 'active'); setDot(2, ''); setDot(3, '');
+    }
+
+    function onFaceMeshResults(results) {
+        if (livenessState === 'INIT' || livenessState === 'VERIFYING') return;
+
+        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+            if (livenessState !== 'ALIGN') {
+                livenessState = 'ALIGN'; setStatus("Detecting Face...", "var(--accent-light)");
+                setDot(1, 'active'); setDot(2, ''); setDot(3, '');
+            }
+            return;
+        }
+
+        const landmarks = results.multiFaceLandmarks[0];
+        
+        if (livenessState === 'ALIGN') {
+            const nose = landmarks[1];
+            if (nose.x > 0.3 && nose.x < 0.7 && nose.y > 0.3 && nose.y < 0.7) {
+                livenessState = 'BLINK';
+                setDot(1, 'passed'); setDot(2, 'active');
+                setStatus("Slowly blink your eyes", "var(--text)");
+            } else { setStatus("Please center your face", "var(--warning)"); }
+        } 
+        else if (livenessState === 'BLINK') {
+            const leftUpper = landmarks[159].y, leftLower = landmarks[145].y;
+            const rightUpper = landmarks[386].y, rightLower = landmarks[374].y;
+            if ((leftLower - leftUpper) < 0.015 && (rightLower - rightUpper) < 0.015) {
+                livenessState = 'TURN';
+                setDot(2, 'passed'); setDot(3, 'active');
+                setStatus("Turn head slightly to the left", "var(--text)");
+            }
+        }
+        else if (livenessState === 'TURN') {
+            if (landmarks[1].x > 0.6) {
+                livenessState = 'READY';
+                setDot(3, 'passed');
+                setStatus("Hold still...", "var(--success)");
+                setTimeout(() => verifyAdminFace(), 1000);
+            }
+        }
+    }
+
+    async function verifyAdminFace() {
+        livenessState = 'VERIFYING';
+        document.getElementById('auth-container').className = "face-auth-container";
+        setStatus("Authenticating via AI...", "var(--warning)");
+
+        try {
+            const video = document.getElementById('el-webcam');
+            const canvas = document.getElementById('el-canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+            const fd = new FormData(); fd.append('live_image', blob, 'face.jpg');
+            const token = getTokens()?.access;
+            const res = await fetch('/api/auth/verify-face/', { method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.error || 'Face verification failed');
+            
+            livenessState = 'SUCCESS';
+            document.getElementById('auth-container').className = "face-auth-container success";
+            setStatus("Identity Confirmed!", "var(--success)");
+            
+            if (elCamStream) { elCamStream.getTracks().forEach(t => t.stop()); elCamStream = null; }
+            setTimeout(() => {
+                document.getElementById('el-step-face').style.display = 'none';
+                document.getElementById('el-step-form').style.display = 'block';
+                prefillLocationFields();
+            }, 1000);
+
+        } catch(err) {
+            document.getElementById('auth-container').className = "face-auth-container error";
+            setStatus("Verification Failed", "var(--danger)");
+            const alertBox = document.getElementById('el-face-msg');
+            alertBox.innerHTML = `❌ ${err.message}`; alertBox.classList.remove('hidden');
+            document.getElementById('start-verification-btn').style.display = "inline-block";
+            document.getElementById('start-verification-btn').textContent = "Retry Verification";
+        }
+    }
+
+    /* ── ELECTION CRUD ── */
+    function toggleLevelFields() {
+        const l = document.getElementById('el-level').value;
+        document.getElementById('level-fields-village').style.display = l==='village'?'flex':'none';
+        document.getElementById('level-fields-state').style.display = l==='state'?'block':'none';
+    }
+    function prefillLocationFields() {
+        document.getElementById('el-village').value = user.village||'';
+        document.getElementById('el-state-village').value = user.state||'';
+        try { document.getElementById('el-state').value = user.state||''; } catch(e){}
+    }
+    async function handleCreateElection(ev) {
+        ev.preventDefault(); const btn = ev.target.querySelector('button[type="submit"]'); btn.disabled=true; btn.textContent='Creating...';
+        const level = document.getElementById('el-level').value;
+        let elState='', elVillage='';
+        if (level==='village') { elVillage=document.getElementById('el-village').value.trim(); elState=document.getElementById('el-state-village').value.trim(); if(!elVillage||!elState){showToast('Village/State required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} }
+        else if (level==='state') { elState=document.getElementById('el-state').value.trim(); if(!elState){showToast('State required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} }
+        try {
+            await createElection({ title:document.getElementById('el-title').value, description:document.getElementById('el-desc').value, level, constituency:level==='village'?elVillage:(level==='state'?elState:'National'), state:elState, village:elVillage, start_time:new Date(document.getElementById('el-start').value).toISOString(), end_time:new Date(document.getElementById('el-end').value).toISOString(), status:'active' });
+            showToast('Election created!'); ev.target.reset(); closeElectionModal(); loadAdminData();
+        } catch(e) { showToast('Error creating election','error'); }
+        finally { btn.disabled=false; btn.textContent='Create Election'; }
+    }
+    
+    function editElection(id) {
+        const e = electionCache.find(x => x.id === id);
+        if (!e) return;
+        document.getElementById('ed-el-id').value = e.id;
+        document.getElementById('ed-el-title').value = e.title;
+        document.getElementById('ed-el-status').value = e.status;
+        
+        // Format dates for datetime-local
+        const formatForInput = (dStr) => {
+            if (!dStr) return '';
+            const d = new Date(dStr);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 16);
+        };
+        
+        document.getElementById('ed-el-start').value = formatForInput(e.start_time);
+        document.getElementById('ed-el-end').value = formatForInput(e.end_time);
+        openModal('edit-election-modal');
+    }
+    
+    async function handleUpdateElection(ev) {
+        ev.preventDefault();
+        const btn = ev.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = 'Saving...';
+        
+        const id = document.getElementById('ed-el-id').value;
+        const payload = {
+            title: document.getElementById('ed-el-title').value,
+            status: document.getElementById('ed-el-status').value,
+            start_time: new Date(document.getElementById('ed-el-start').value).toISOString(),
+            end_time: new Date(document.getElementById('ed-el-end').value).toISOString()
+        };
+        
+        try {
+            await updateElection(id, payload);
+            showToast('Election updated!');
+            closeModal('edit-election-modal');
+            loadAdminData();
+        } catch(e) {
+            showToast(e.message || 'Error updating election', 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Save Changes';
+        }
+    }
+
+    async function deleteEl(id) {
+        if(!confirm('Destroy this election? All votes will be lost.')) return;
+        try {
+            await deleteElection(id);
+            showToast('Election destroyed.'); loadAdminData();
+        } catch(e){ showToast('Error','error'); }
+    }
+    async function handleAddCandidate(ev) {
+        ev.preventDefault(); const btn = ev.target.querySelector('button[type="submit"]'); btn.disabled=true; btn.textContent='Adding...';
+        try {
+            const fd = new FormData();
+            fd.append('election', document.getElementById('cand-election').value);
+            fd.append('name', document.getElementById('cand-name').value);
+            fd.append('party', document.getElementById('cand-party').value);
+            fd.append('symbol', document.getElementById('cand-symbol').value);
+            const p1 = document.getElementById('cand-photo').files[0]; if(p1) fd.append('photo',p1);
+            const p2 = document.getElementById('cand-party-photo').files[0]; if(p2) fd.append('party_photo',p2);
+            await createCandidate(fd); showToast('Candidate added!'); ev.target.reset();
+        } catch(e) { showToast('Error adding candidate','error'); }
+        finally { btn.disabled=false; btn.textContent='Add Candidate'; }
+    }
+
+    /* ── INIT ── */
+    loadAdminData();
+</script>
 </body>
 </html>

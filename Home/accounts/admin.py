@@ -1,5 +1,39 @@
 from django.contrib import admin
-from .models import User, OTP, VoterVerification
+from .models import User, OTP, VoterVerification, VoterRoll, VillageAdmin
+
+
+@admin.register(VoterRoll)
+class VoterRollAdmin(admin.ModelAdmin):
+    list_display = ['voter_id', 'full_name', 'email', 'village', 'state', 'designated_role', 'is_registered']
+    list_filter = ['state', 'designated_role', 'is_registered']
+    list_editable = ['designated_role']
+    search_fields = ['voter_id', 'full_name', 'email', 'mobile_number', 'village']
+    readonly_fields = ['created_at', 'is_registered']
+    ordering = ['state', 'village', 'full_name']
+    list_per_page = 50
+    actions = ['reset_registration_flag']
+
+    def reset_registration_flag(self, request, queryset):
+        updated = queryset.update(is_registered=False)
+        self.message_user(request, f"{updated} voter(s) reset — they can re-register now.")
+    reset_registration_flag.short_description = 'Reset registration flag (allow re-registration)'
+
+
+@admin.register(VillageAdmin)
+class VillageAdminModelAdmin(admin.ModelAdmin):
+    list_display = ['admin_id', 'full_name', 'email', 'village', 'state', 'designated_role', 'is_registered']
+    list_filter = ['state', 'designated_role', 'is_registered']
+    list_editable = ['designated_role']
+    search_fields = ['admin_id', 'full_name', 'email', 'mobile_number', 'village']
+    readonly_fields = ['created_at', 'is_registered']
+    ordering = ['state', 'village', 'full_name']
+    list_per_page = 50
+    actions = ['reset_registration_flag']
+
+    def reset_registration_flag(self, request, queryset):
+        updated = queryset.update(is_registered=False)
+        self.message_user(request, f"{updated} admin(s) reset — they can re-register now.")
+    reset_registration_flag.short_description = 'Reset registration flag (allow re-registration)'
 
 
 @admin.register(User)

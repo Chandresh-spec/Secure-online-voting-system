@@ -3,6 +3,91 @@ from django.db import models
 import uuid
 
 
+class VoterRoll(models.Model):
+    """
+    Local village voter roll — pre-populated by election officers.
+    A citizen can only register if their voter_id + email exist here.
+    """
+    voter_id = models.CharField(max_length=30, unique=True)
+    email = models.EmailField()
+    mobile_number = models.CharField(max_length=15, blank=True)
+    full_name = models.CharField(max_length=150)
+    village = models.CharField(max_length=100)
+    district = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100)
+    nation = models.CharField(max_length=100, default='India')
+    date_of_birth = models.DateField(null=True, blank=True)
+    is_registered = models.BooleanField(
+        default=False,
+        help_text='Becomes True once the voter completes online registration.'
+    )
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('officer', 'Election Officer'),
+        ('voter', 'Voter'),
+    )
+    designated_role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        default='voter',
+        help_text='If set to Admin, the user automatically becomes the Village Admin upon registration.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'voter_rolls'
+        indexes = [
+            models.Index(fields=['voter_id']),
+            models.Index(fields=['email']),
+            models.Index(fields=['village', 'state']),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.voter_id}) — {self.village}, {self.state}"
+
+
+class VillageAdmin(models.Model):
+    """
+    Dedicated table for Village Admins to avoid mixing them with VoterRoll.
+    Functionality matches VoterRoll but strictly for administrative roles.
+    """
+    admin_id = models.CharField(max_length=30, unique=True, verbose_name="Admin ID")
+    email = models.EmailField()
+    mobile_number = models.CharField(max_length=15, blank=True)
+    full_name = models.CharField(max_length=150)
+    village = models.CharField(max_length=100)
+    district = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100)
+    nation = models.CharField(max_length=100, default='India')
+    date_of_birth = models.DateField(null=True, blank=True)
+    is_registered = models.BooleanField(
+        default=False,
+        help_text='Becomes True once the admin completes online registration.'
+    )
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('officer', 'Election Officer'),
+    )
+    designated_role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        default='admin',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'village_admins'
+        indexes = [
+            models.Index(fields=['admin_id']),
+            models.Index(fields=['email']),
+            models.Index(fields=['village', 'state']),
+        ]
+
+    def __str__(self):
+        return f"Admin: {self.full_name} ({self.admin_id}) — {self.village}, {self.state}"
+
+
+
 class User(AbstractUser):
     """Custom user model with voter-specific fields and role support."""
 

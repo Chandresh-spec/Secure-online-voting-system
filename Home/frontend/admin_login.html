@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="SecureVote — Village Admin Authentication Portal">
+<title>SecureVote — Village Admin Portal</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+/* ── Progressive form ── */
+.auth-card { position: relative; overflow: hidden; }
+
+.prog-header { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+.prog-back {
+    background: none; border: none; color: var(--text-muted, #a38d82);
+    font-size: 1.1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: all .2s;
+}
+.prog-back:hover { background: rgba(74,46,36,.08); color: var(--text-primary, #4a2e24); }
+.prog-bar-wrap { flex:1; height:3px; background: rgba(74,46,36,.1); border-radius:2px; overflow:hidden; }
+.prog-bar-fill {
+    height:100%; background: linear-gradient(90deg, #6C63FF, #10B981);
+    border-radius:2px; transition: width .5s cubic-bezier(.4,0,.2,1);
+}
+.prog-label { font-size:.72rem; color:var(--text-muted, #a38d82); white-space:nowrap; font-weight:600; }
+
+/* ── Slides ── */
+.q-viewport { position:relative; min-height:300px; }
+.q-slide {
+    position:absolute; width:100%; top:0; left:0;
+    opacity:0; transform:translateX(60px); pointer-events:none;
+    transition: opacity .4s ease, transform .4s cubic-bezier(.4,0,.2,1);
+}
+.q-slide.active  { opacity:1; transform:translateX(0); pointer-events:all; }
+.q-slide.exiting { opacity:0; transform:translateX(-60px); pointer-events:none; }
+
+/* ── Question UI ── */
+.q-icon { font-size:2rem; margin-bottom:8px; }
+.q-title { font-size:1.2rem; font-weight:700; color: var(--text-primary, #4a2e24); margin-bottom:5px; line-height:1.4; }
+.q-hint  { font-size:.78rem; color: var(--text-secondary, #7a5a4a); margin-bottom:18px; line-height:1.5; }
+.q-input {
+    width:100%; box-sizing:border-box;
+    background: #ffffff; border:1.5px solid #cccccc;
+    border-radius:12px; padding:14px 18px; font-size:1rem; color: var(--text-primary, #4a2e24);
+    outline:none; transition: border-color .2s, box-shadow .2s;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+.q-input:focus { border-color: #6C63FF; box-shadow:0 0 0 3px rgba(108,99,255,.18); }
+.q-input[readonly] { background: rgba(108,99,255,.04); border-color: rgba(108,99,255,.2); color: var(--text-muted); cursor:default; }
+.q-input.otp  { text-align:center; font-size:2rem; letter-spacing:18px; font-weight:700; }
+.q-input.pass { font-size:1.2rem; letter-spacing:4px; }
+.q-input.upper { text-transform:uppercase; letter-spacing:2px; }
+.q-msg { margin-top:8px; min-height:18px; font-size:.78rem; }
+.q-msg.ok  { color: #10B981; } .q-msg.err { color: #EF4444; } .q-msg.inf { color: #3B82F6; }
+
+/* ── Button ── */
+.q-footer { display:flex; align-items:center; gap:10px; margin-top:20px; }
+.q-btn {
+    background: linear-gradient(135deg, #6C63FF, #4F46E5); color:#fff; border:none; border-radius:10px;
+    padding:12px 28px; font-size:.95rem; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+    box-shadow: 0 2px 8px rgba(108,99,255,.3); transition: transform .15s, box-shadow .15s, opacity .2s;
+}
+.q-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow: 0 4px 12px rgba(108,99,255,.4); }
+.q-btn:disabled { opacity:.5; cursor:not-allowed; }
+.q-enter-hint { font-size:.7rem; color: var(--text-muted); }
+.q-enter-hint kbd { background: rgba(74,46,36,.06); border:1px solid rgba(74,46,36,.15); border-radius:4px; padding:1px 5px; font-size:.65rem; }
+
+.verified-strip {
+    display:flex; align-items:center; gap:10px;
+    background: rgba(16,185,129,.15); border:1px solid rgba(16,185,129,.3);
+    border-radius:10px; padding:10px 14px; margin-bottom:14px;
+    font-size:.8rem; color: #10B981; font-weight:600;
+}
+.success-screen { text-align:center; padding:20px 0; }
+.success-screen .big-icon { font-size:4rem; animation:popIn .5s cubic-bezier(.175,.885,.32,1.275); }
+.success-screen h2 { font-size:1.3rem; margin:12px 0 8px; }
+.success-screen p  { font-size:.85rem; color: var(--text-secondary); }
+
+.spin { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spinR .7s linear infinite; vertical-align:middle; margin-right:5px; }
+@keyframes spinR { to { transform:rotate(360deg); } }
+@keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+
+/* ── Admin branding accent ── */
+.admin-badge { display:inline-block; background:linear-gradient(135deg,#6C63FF,#4F46E5); color:#fff; padding:3px 12px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:1px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="auth-wrapper">
+<div class="auth-card">
+
+    <!-- Header -->
+    <div class="auth-header">
+        <div class="logo">🛡️</div>
+        <h1>SecureVote</h1>
+        <p>Village Admin Portal</p>
+        <div class="admin-badge">ADMIN ACCESS</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</button>
+        <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+
+    <!-- ══ LOGIN ══ -->
+    <form id="login-form" onsubmit="doLogin(event)">
+        <div id="login-err"></div>
+        <div class="form-group">
+            <label class="form-label">Admin Email</label>
+            <input type="email" class="form-input" id="l-email" placeholder="admin@example.com" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-input" id="l-pass" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%; background:linear-gradient(135deg,#6C63FF,#4F46E5)" id="login-btn">Sign In as Admin</button>
+    </form>
+
+    <!-- ══ PROGRESSIVE REGISTER ══ -->
+    <div id="reg-progressive" class="hidden">
+        <div class="prog-header">
+            <button class="prog-back" id="prog-back-btn" onclick="goBack()" title="Back">←</button>
+            <div class="prog-bar-wrap"><div class="prog-bar-fill" id="prog-bar"></div></div>
+            <span class="prog-label" id="prog-label">1 / 10</span>
+        </div>
+        <div class="verified-strip hidden" id="verified-strip">
+            ✅ &nbsp;<span id="verified-name">Admin verified</span>
+        </div>
+        <div class="q-viewport" id="q-viewport"></div>
+    </div>
+
+    <!-- ══ SUCCESS ══ -->
+    <div id="reg-success" class="hidden">
+        <div class="success-screen">
+            <div class="big-icon">🎉</div>
+            <h2>Admin Account Created!</h2>
+            <p id="success-msg">Redirecting to Admin Panel…</p>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+if (isLoggedIn()) {
+    const u = getUser();
+    if (u && (u.role === 'admin' || u.role === 'officer')) {
+        location.href = '/admin-panel/';
+    } else {
+        location.href = '/dashboard/';
+    }
+}
+
+/* ── STATE ── */
+let state = {
+    voter_id: '', email: '', voter_name: '', voter_data: null,
+    first_name: '', last_name: '', username: '',
+    phone: '', village: '', district: '', state_: '', nation: 'India',
+    password: '', password2: '',
+};
+let currentQ = 0, prevQ = -1, otpSent = false;
+
+/* ── QUESTIONS ── */
+const Q = [
+    { id:'voter_id', icon:'🛡️', title:'What is your Admin ID?', hint:'The unique ID assigned to you as a Village Admin (e.g. ADM-72905)', type:'text', placeholder:'ADM-XXXXXXXX', cls:'upper', action:'next' },
+    { id:'email', icon:'📧', title:'What is your registered email?', hint:'The email linked to your Admin ID in the system.', type:'email', placeholder:'admin@example.com', action:'send-otp', btnLabel:'Send OTP →' },
+    { id:'otp', icon:'🔢', title:'Enter the OTP sent to your email', hint:'Check your inbox — valid for 10 minutes.', type:'text', placeholder:'• • • • • •', maxlen:6, cls:'otp', action:'verify-otp', btnLabel:'Verify OTP →' },
+    { id:'first_name', icon:'👤', title:'What is your first name?', hint:'As per official records.', type:'text', placeholder:'First name', action:'next' },
+    { id:'last_name', icon:'👤', title:'And your last name?', hint:'', type:'text', placeholder:'Last name', action:'next' },
+    { id:'username', icon:'🆔', title:'Choose a username', hint:'This is how you will log in.', type:'text', placeholder:'e.g. admin_sharma', action:'next' },
+    { id:'phone', icon:'📱', title:'Your phone number?', hint:'Optional — used for alerts.', type:'tel', placeholder:'+91 9876543210', action:'next', optional:true },
+    { id:'village', icon:'🏘️', title:'What Village do you manage?', hint:'Your administrative jurisdiction.', type:'text', placeholder:'e.g. Bhatkal', action:'next' },
+    { id:'district', icon:'🗺️', title:'What is your District?', hint:'', type:'text', placeholder:'e.g. Uttara Kannada', action:'next' },
+    { id:'state_', icon:'🏛️', title:'What is your State?', hint:'', type:'text', placeholder:'e.g. Karnataka', action:'next' },
+    { id:'nation', icon:'🇮🇳', title:'What is your Nation?', hint:'', type:'text', placeholder:'India', action:'next' },
+    { id:'password', icon:'🔐', title:'Create a strong password', hint:'Minimum 8 characters.', type:'password', placeholder:'Min 8 characters', cls:'pass', action:'next' },
+    { id:'password2', icon:'🔐', title:'Confirm your password', hint:'', type:'password', placeholder:'Re-enter password', cls:'pass', action:'submit', btnLabel:'🚀 Create Admin Account' },
+];
+
+/* ── BUILD SLIDES ── */
+function buildSlides() {
+    const vp = document.getElementById('q-viewport');
+    vp.innerHTML = '';
+    Q.forEach((q, i) => {
+        const div = document.createElement('div');
+        div.className = 'q-slide'; div.id = `q-slide-${i}`;
+        const btnLabel = q.btnLabel || 'Next →';
+        const optText = q.optional ? ' <span style="color:var(--text-muted);font-weight:400">(optional)</span>' : '';
+        div.innerHTML = `
+            <div class="q-icon">${q.icon}</div>
+            <div class="q-title">${q.title}${optText}</div>
+            <div class="q-hint">${q.hint}</div>
+            <input class="q-input${q.cls ? ' '+q.cls : ''}" id="q-input-${i}" type="${q.type}" placeholder="${q.placeholder}" ${q.maxlen ? `maxlength="${q.maxlen}"` : ''} autocomplete="off" spellcheck="false">
+            <div class="q-msg" id="q-msg-${i}"></div>
+            <div class="q-footer">
+                <button class="q-btn" id="q-btn-${i}" type="button" onclick="advance(${i})">${btnLabel}</button>
+                <span class="q-enter-hint">or press <kbd>Enter</kbd></span>
+            </div>`;
+        vp.appendChild(div);
+        div.querySelector(`#q-input-${i}`).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); advance(i); } });
+    });
+}
+
+/* ── NAVIGATION ── */
+function showSlide(idx, direction = 'forward') {
+    if (prevQ >= 0) { const old = document.getElementById(`q-slide-${prevQ}`); if (old) { old.classList.add('exiting'); setTimeout(() => old.classList.remove('exiting','active'), 450); } }
+    const el = document.getElementById(`q-slide-${idx}`); if (!el) return;
+    if (direction === 'back') { el.style.transform='translateX(-60px)'; el.style.opacity='0'; setTimeout(() => { el.style.transform=''; el.style.opacity=''; }, 10); }
+    el.classList.add('active');
+    setTimeout(() => { const inp = document.getElementById(`q-input-${idx}`); if(inp && !inp.readOnly) inp.focus(); }, 450);
+    document.getElementById('prog-bar').style.width = Math.round(((idx+1)/Q.length)*100) + '%';
+    document.getElementById('prog-label').textContent = `${idx+1} / ${Q.length}`;
+    prevQ = idx; currentQ = idx;
+}
+function goBack() { if (currentQ <= 0) { switchTab('login'); return; } const el = document.getElementById(`q-slide-${currentQ}`); if (el) el.classList.remove('active'); prevQ = currentQ; currentQ--; showSlide(currentQ, 'back'); }
+function moveNext() { const next = currentQ + 1; if (next >= Q.length) return; const cur = document.getElementById(`q-slide-${currentQ}`); if (cur) cur.classList.remove('active'); prevQ = currentQ; currentQ = next; showSlide(next); }
+
+/* ── ADVANCE ── */
+async function advance(idx) {
+    const q = Q[idx], inp = document.getElementById(`q-input-${idx}`), msg = document.getElementById(`q-msg-${idx}`), btn = document.getElementById(`q-btn-${idx}`), val = inp.value.trim();
+    msg.className = 'q-msg'; msg.textContent = '';
+    if (!q.optional && !val) { setMsg(msg, 'Please fill this in.', 'err'); return; }
+    if (q.id === 'password' && val.length < 8) { setMsg(msg, 'Min 8 characters.', 'err'); return; }
+    if (q.id === 'password2' && val !== state.password) { setMsg(msg, 'Passwords do not match.', 'err'); return; }
+    state[q.id] = val;
+
+    if (q.action === 'next') { moveNext(); }
+    else if (q.action === 'send-otp') {
+        btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Checking admin database…';
+        try {
+            const res = await sendVoterOTP(state.voter_id.toUpperCase(), val.toLowerCase());
+            if (res.sent) {
+                otpSent = true; state.voter_name = res.voter_name;
+                setMsg(msg, `✓ OTP sent to ${res.masked_email}`, 'ok');
+                setTimeout(() => { moveNext(); if (res.dev_otp) { setTimeout(() => { const o = document.getElementById(`q-input-${idx+1}`); if(o) o.value = res.dev_otp; setMsg(document.getElementById(`q-msg-${idx+1}`), 'Auto-filled (Dev Mode)', 'inf'); }, 500); } }, 700);
+            } else { setMsg(msg, res.error || 'Not found in admin database.', 'err'); }
+        } catch(e) { setMsg(msg, e.data?.error || 'Admin ID/Email not found in the admin database.', 'err'); }
+        btn.disabled = false; btn.innerHTML = 'Send OTP →';
+    }
+    else if (q.action === 'verify-otp') {
+        btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Verifying…';
+        try {
+            const res = await verifyVoterOTP(state.voter_id.toUpperCase(), state.email.toLowerCase(), val);
+            if (res.verified) {
+                state.voter_data = res.voter_data;
+                if (res.voter_data.full_name) { const p = res.voter_data.full_name.split(' '); state.first_name = p[0]||''; state.last_name = p.slice(1).join(' ')||''; }
+                state.village = res.voter_data.village||''; state.district = res.voter_data.district||''; state.state_ = res.voter_data.state||''; state.nation = res.voter_data.nation||'India';
+                if (res.voter_data.mobile_number) state.phone = res.voter_data.mobile_number;
+                document.getElementById('verified-strip').classList.remove('hidden');
+                document.getElementById('verified-name').textContent = `${state.voter_name} — ${state.village}, ${state.state_}`;
+                setMsg(msg, '✓ Verified! Admin data loaded.', 'ok');
+                setTimeout(() => { prefillFrom(); moveNext(); }, 800);
+            } else { setMsg(msg, res.error || 'Incorrect OTP.', 'err'); }
+        } catch(e) { setMsg(msg, e.data?.error || 'Incorrect OTP.', 'err'); }
+        btn.disabled = false; btn.innerHTML = 'Verify OTP →';
+    }
+    else if (q.action === 'submit') {
+        btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Creating admin account…';
+        try {
+            const vd = state.voter_data || {};
+            const res = await register({
+                voter_id: state.voter_id.toUpperCase(), email: state.email.toLowerCase(),
+                first_name: state.first_name, last_name: state.last_name, username: state.username,
+                phone: state.phone, password: state.password, password2: state.password2,
+                village: vd.village || state.village, district: vd.district || state.district, state: vd.state || state.state_,
+            });
+            saveTokens(res.tokens); saveUser(res.user);
+            document.getElementById('reg-progressive').classList.add('hidden');
+            document.getElementById('reg-success').classList.remove('hidden');
+            document.getElementById('auth-tabs').classList.add('hidden');
+            if (res.already_verified) {
+                document.getElementById('success-msg').textContent = 'Redirecting to Admin Panel…';
+                setTimeout(() => location.href = '/admin-panel/', 2000);
+            } else {
+                document.getElementById('success-msg').textContent = `Verification OTP sent to ${state.email}. Redirecting…`;
+                setTimeout(() => location.href = '/verify/', 2500);
+            }
+        } catch(e) {
+            const errObj = e.data || {};
+            setMsg(msg, errObj.error || Object.values(errObj).flat()[0] || 'Registration failed.', 'err');
+            btn.disabled = false; btn.innerHTML = '🚀 Create Admin Account';
+        }
+    }
+}
+
+/* ── HELPERS ── */
+function prefillFrom() {
+    const map = { first_name:3, last_name:4, phone:6, village:7, district:8, state_:9, nation:10 };
+    for (const [key, idx] of Object.entries(map)) { if (state[key]) { const el = document.getElementById(`q-input-${idx}`); if (el) el.value = state[key]; } }
+}
+function setMsg(el, text, type) { el.className = 'q-msg ' + type; el.textContent = text; }
+
+/* ── TAB SWITCHING ── */
+function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+    document.getElementById('reg-progressive').classList.toggle('hidden', tab !== 'register');
+    document.getElementById('reg-success').classList.add('hidden');
+    document.getElementById('auth-tabs').classList.remove('hidden');
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    if (tab === 'register' && currentQ === 0 && !document.getElementById('q-slide-0')) { buildSlides(); showSlide(0); }
+}
+
+/* ── LOGIN ── */
+async function doLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Signing in…';
+    try {
+        const data = await login(document.getElementById('l-email').value, document.getElementById('l-pass').value);
+        saveTokens(data.tokens); saveUser(data.user);
+        if (data.user.role !== 'admin' && data.user.role !== 'officer') {
+            document.getElementById('login-err').innerHTML = '<div class="alert alert-error">✗ This account is not an admin. Use the <a href="/">Voter Portal</a> instead.</div>';
+            clearAuth();
+        } else {
+            location.href = data.user.is_verified ? '/admin-panel/' : '/verify/';
+        }
+    } catch(err) {
+        const msg = err.data?.non_field_errors?.[0] || err.data?.error || 'Login failed.';
+        document.getElementById('login-err').innerHTML = `<div class="alert alert-error">✗ ${msg}</div>`;
+    } finally { btn.disabled = false; btn.innerHTML = 'Sign In as Admin'; }
+}
+
+/* ── Shake keyframe ── */
+const ks = document.createElement('style');
+ks.textContent = `@keyframes shakeX{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}`;
+document.head.appendChild(ks);
+</script>
+    <div class="auth-footer">
+        Secure • Transparent • Democratic<br>
+        <a href="/" style="color:#6C63FF; text-decoration:none; font-size:0.85rem; margin-top:10px; display:inline-block;">← Back to Voter Portal</a>
+    </div>
+</body>
+</html>

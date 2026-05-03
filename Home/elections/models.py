@@ -64,6 +64,8 @@ class Candidate(models.Model):
     party = models.CharField(max_length=200)
     symbol = models.CharField(max_length=100, blank=True)
     photo = models.ImageField(upload_to='candidates/', blank=True, null=True)
+    party_photo = models.ImageField(upload_to='parties/', blank=True, null=True)
+    party_brochure = models.ImageField(upload_to='brochures/', blank=True, null=True)
     manifesto = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

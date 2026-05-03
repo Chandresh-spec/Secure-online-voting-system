@@ -187,29 +187,11 @@
             </div>
         </div>
 
-        <!-- Email Verification Section -->
-        <div id="email-auth-section" class="hidden" style="text-align:center;margin-top:32px">
-            <div class="card" style="max-width:500px;margin:0 auto">
-                <h3>Verify Email to Receive OTP</h3>
-                <p class="mt-1 text-muted">Please enter your registered Gmail address to receive the verification OTP.</p>
-                <div class="form-group mt-2" style="max-width:300px; margin: 15px auto;">
-                    <input type="email" id="vote-email-input" class="form-input" style="text-align:center;" placeholder="Enter your email" required>
-                </div>
-                <p id="email-alert" class="alert hidden" style="font-size:0.85rem; margin-bottom:15px"></p>
-                <div class="mt-2 flex gap-2" style="justify-content:center">
-                    <button class="btn btn-primary btn-lg" id="trigger-otp-btn" onclick="triggerSendOTP()">
-                        Send OTP
-                    </button>
-                    <button class="btn btn-secondary" onclick="cancelEmailAuth()">Cancel</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- OTP Verification Section -->
+        <!-- OTP Verification Section (auto-sent after face verification) -->
         <div id="otp-auth-section" class="hidden" style="text-align:center;margin-top:32px">
             <div class="card" style="max-width:500px;margin:0 auto">
                 <h3>Enter OTP</h3>
-                <p class="mt-1 text-muted">An OTP has been sent to your email address.</p>
+                <p class="mt-1 text-muted" id="otp-sent-msg">An OTP has been sent to your registered email.</p>
                 <div class="form-group mt-2" style="max-width:300px; margin: 15px auto;">
                     <input type="text" id="vote-otp-input" class="form-input" style="text-align:center; font-weight:bold; letter-spacing:2px; font-size:1.2rem;" placeholder="Enter 6-digit OTP" required maxlength="6">
                 </div>
@@ -228,6 +210,7 @@
             <div style="font-size:4rem;margin-bottom:16px">✅</div>
             <h2>Vote Cast Successfully!</h2>
             <p class="text-muted mt-1">Your vote has been recorded securely and anonymously.</p>
+            <p class="mt-1" style="font-size:0.85rem; color:var(--success)">📧 A confirmation email has been sent to your registered email.</p>
             <p class="mt-2" style="font-size:0.85rem">Vote Hash: <code id="vote-hash" style="color:var(--accent-light)"></code></p>
             <div class="mt-3 flex gap-2" style="justify-content:center">
                 <a href="/elections/" class="btn btn-primary">Browse Elections</a>
@@ -249,7 +232,10 @@
         const electionId = params.get('id');
         let selectedCandidateId = null;
 
-        if (!electionId) {
+        if (user && (user.role === 'admin' || user.role === 'officer')) {
+            document.getElementById('election-title').textContent = 'Access Restricted';
+            document.getElementById('voting-section').innerHTML = '<div class="alert alert-error" style="margin-top:20px; font-size: 1.1rem; padding: 20px;">❌ <strong>Action Denied:</strong> As a Village Admin, you are restricted from participating in the voting process to maintain election neutrality.</div>';
+        } else if (!electionId) {
             document.getElementById('election-title').textContent = 'No election selected';
             document.getElementById('candidates-grid').innerHTML = '<div class="empty-state"><p>Please select an election from the <a href="/elections/">elections page</a>.</p></div>';
         } else {
@@ -284,10 +270,14 @@
 
                 container.innerHTML = candidates.map(c => `
                     <div class="candidate-card" data-id="${c.id}" onclick="selectCandidate('${c.id}', '${c.name} (${c.party})')">
-                        <div class="candidate-avatar">${c.name.charAt(0)}</div>
-                        <div class="candidate-name">${c.name}</div>
-                        <div class="candidate-party">${c.party}</div>
-                        <div class="candidate-symbol">${c.symbol || '🏳️'}</div>
+                        <div class="candidate-avatar" style="${c.photo ? `background-image:url(${c.photo});background-size:cover;background-position:top center;color:transparent;` : ''}">${c.name.charAt(0)}</div>
+                        <div class="candidate-name" style="font-size:1.4rem; margin-top:10px;">${c.name}</div>
+                        <div class="candidate-party" style="font-size:1rem; opacity:0.8;">${c.party}</div>
+                        <div class="candidate-symbol" style="margin-top:15px; min-height:50px;">
+                            ${c.party_photo 
+                                ? `<img src="${c.party_photo}" alt="${c.party}" style="max-width:80px; max-height:50px; border-radius:8px; object-fit:contain; drop-shadow(0 4px 6px rgba(0,0,0,0.3));">` 
+                                : `<span style="font-size:2.5rem;">${c.symbol || '🏳️'}</span>`}
+                        </div>
                     </div>
                 `).join('');
 
@@ -508,16 +498,31 @@
                     throw new Error(verifyData.error || verifyData.message || 'Face verification failed.');
                 }
 
-                // FACE VERIFIED — now ask for Email
+                // FACE VERIFIED — auto-send OTP to registered email
                 livenessState = 'SUCCESS';
                 document.getElementById('auth-container').className = "face-auth-container success";
                 setStatus("Identity Confirmed!", "var(--success)");
                 stopCamera();
                 
-                setTimeout(() => {
+                setTimeout(async () => {
                     document.getElementById('face-auth-section').classList.add('hidden');
-                    document.getElementById('email-auth-section').classList.remove('hidden');
-                    VoiceEngine.speak("Face verified. Please enter your registered email address to receive an OTP.");
+                    // Auto-send OTP to registered email
+                    try {
+                        const otpRes = await sendVoteOTP();
+                        const maskedEmail = otpRes.masked_email || 'your registered email';
+                        document.getElementById('otp-sent-msg').textContent = 
+                            `An OTP has been sent to ${maskedEmail}. Enter it below to confirm your vote.`;
+                        document.getElementById('otp-auth-section').classList.remove('hidden');
+                        VoiceEngine.speak(`Face verified. An OTP has been sent to your registered email. Please enter it to complete your vote.`);
+                    } catch (otpErr) {
+                        const msg = otpErr.data?.error || 'Failed to send OTP.';
+                        document.getElementById('otp-auth-section').classList.remove('hidden');
+                        const alertEl = document.getElementById('otp-alert');
+                        alertEl.textContent = `❌ ${msg}`;
+                        alertEl.className = 'alert alert-error';
+                        alertEl.classList.remove('hidden');
+                        VoiceEngine.speak('Face verified but failed to send OTP. Please try again.');
+                    }
                 }, 1000);
 
             } catch (err) {
@@ -558,45 +563,6 @@
             livenessState = 'INIT';
             document.getElementById('face-auth-section').classList.add('hidden');
             document.getElementById('voting-section').classList.remove('hidden');
-        }
-
-        async function triggerSendOTP() {
-            const email = document.getElementById('vote-email-input').value.trim();
-            const alertEl = document.getElementById('email-alert');
-            
-            if (!email) {
-                alertEl.textContent = '❌ Please enter your email';
-                alertEl.className = 'alert alert-error';
-                alertEl.classList.remove('hidden');
-                return;
-            }
-
-            const btn = document.getElementById('trigger-otp-btn');
-            btn.disabled = true;
-            btn.textContent = 'Sending...';
-            alertEl.classList.add('hidden');
-
-            try {
-                await sendVoteOTP(email);
-                document.getElementById('email-auth-section').classList.add('hidden');
-                document.getElementById('otp-auth-section').classList.remove('hidden');
-                VoiceEngine.speak("An OTP has been sent. Please enter it to complete your vote.");
-            } catch (err) {
-                const msg = err.data?.error || err.message || 'Failed to send OTP.';
-                alertEl.textContent = `❌ ${msg}`;
-                alertEl.className = 'alert alert-error';
-                alertEl.classList.remove('hidden');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Send OTP';
-            }
-        }
-
-        function cancelEmailAuth() {
-            document.getElementById('email-auth-section').classList.add('hidden');
-            document.getElementById('voting-section').classList.remove('hidden');
-            document.getElementById('vote-email-input').value = '';
-            document.getElementById('email-alert').classList.add('hidden');
         }
 
         async function submitVoteOTP() {
