@@ -1,11 +1,16 @@
 import hashlib
 import uuid
-from django.db import transaction
+import random
+from datetime import timedelta
 from django.utils import timezone
+from django.db import transaction
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from accounts.models import OTP
 from .models import Vote, VoteRecord
 from .serializers import CastVoteSerializer
 from elections.models import Election, Candidate
@@ -25,11 +30,28 @@ class CastVoteView(APIView):
         user = request.user
         election_id = serializer.validated_data['election_id']
         candidate_id = serializer.validated_data['candidate_id']
+        otp_code = serializer.validated_data['otp_code']
+
+        # Verify OTP
+        otp = OTP.objects.filter(
+            user=user, code=otp_code, is_used=False,
+            expires_at__gte=timezone.now()
+        ).first()
+
+        if not otp:
+            return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Verify user is verified
         if not user.is_verified:
             return Response(
                 {'error': 'You must verify your account before voting.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Admins and officers are not allowed to vote
+        if user.role in ('admin', 'officer'):
+            return Response(
+                {'error': 'Administrators and election officers are restricted from voting to maintain neutrality.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -39,22 +61,29 @@ class CastVoteView(APIView):
         except Election.DoesNotExist:
             return Response({'error': 'Election not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check election is active
-        now = timezone.now()
-        if not (election.start_time <= now <= election.end_time):
+        # Check election is active (use status field set by admin)
+        if election.status != 'active':
             return Response(
                 {'error': 'This election is not currently active.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check eligibility
-        if election.level == 'state' and election.state != user.state:
+        # Helper for strict alignment regardless of spacing
+        def normalize(loc):
+            return (loc or '').lower().replace(' ', '')
+
+        # Check eligibility (case-insensitive and space-insensitive comparison)
+        if election.level == 'state' and normalize(election.state) != normalize(user.state):
             return Response(
                 {'error': 'You are not eligible for this state election.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         elif election.level == 'village':
-            if election.state != user.state or election.district != user.district or election.village != user.village:
+            state_match = normalize(election.state) == normalize(user.state)
+            district_match = normalize(election.district) == normalize(user.district)
+            village_match = normalize(election.village) == normalize(user.village)
+            
+            if not state_match or not district_match or not village_match:
                 return Response(
                     {'error': 'You are not eligible for this village election.'},
                     status=status.HTTP_403_FORBIDDEN
@@ -96,12 +125,35 @@ class CastVoteView(APIView):
                     election=election,
                 )
 
+                # Mark OTP as used after successful vote
+                otp.is_used = True
+                otp.save()
+
             # Trigger async notification
             try:
                 from notifications.tasks import send_vote_confirmation
                 send_vote_confirmation.delay(str(user.id), str(election.id))
             except Exception:
                 pass  # Don't fail the vote if notification fails
+
+            # Send vote confirmation email
+            try:
+                send_mail(
+                    'SecureVote — Vote Confirmation',
+                    f'Hello {user.first_name},\n\n'
+                    f'Your vote in "{election.title}" has been recorded successfully.\n\n'
+                    f'Vote Hash: {vote_hash}\n'
+                    f'Election: {election.title}\n'
+                    f'Date: {timezone.now().strftime("%d %b %Y, %I:%M %p")}\n\n'
+                    f'This is your vote receipt. Keep it safe for your records.\n\n'
+                    f'Thank you for participating in the democratic process!\n'
+                    f'— SecureVote Team',
+                    settings.EMAIL_HOST_USER,
+                    [user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass  # Don't fail the vote if email fails
 
             return Response({
                 'message': 'Vote cast successfully!',
@@ -125,3 +177,59 @@ class VoteStatusView(APIView):
             user=request.user, election_id=election_id
         ).exists()
         return Response({'has_voted': has_voted})
+
+class SendVoteOTPView(APIView):
+    """Send an OTP to the user's registered email for vote confirmation.
+    No email input required — uses the authenticated user's email to prevent bypass."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        # Check for an existing unexpired OTP
+        existing_otp = OTP.objects.filter(
+            user=user, is_used=False, expires_at__gte=timezone.now()
+        ).first()
+
+        if existing_otp:
+            otp_code = existing_otp.code
+            existing_otp.expires_at = timezone.now() + timedelta(minutes=5)
+            existing_otp.save()
+        else:
+            # Generate new OTP
+            otp_code = str(random.randint(100000, 999999))
+            OTP.objects.create(
+                user=user,
+                code=otp_code,
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+
+        subject = 'SecureVote — Confirm Your Vote'
+        message = (
+            f'Hello {user.first_name},\n\n'
+            f'Your OTP to confirm your vote is: {otp_code}\n\n'
+            f'This OTP will expire in 5 minutes. Do not share this code with anyone.\n\n'
+            f'Thank you,\nSecureVote Team'
+        )
+
+        # Mask email for frontend display (e.g. u***@gmail.com)
+        parts = user.email.split('@')
+        masked = parts[0][0] + '***@' + parts[1] if len(parts) == 2 else '***'
+
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+            return Response({
+                'message': f'OTP sent to {masked}.',
+                'masked_email': masked,
+            })
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to send OTP email: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -6,6 +6,8 @@
     <meta name="description" content="Browse active elections and find elections you're eligible to vote in.">
     <title>SecureVote — Elections</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/voice.css">
+    <link rel="stylesheet" href="/static/css/translate.css">
 </head>
 <body>
     <!-- Navbar -->
@@ -19,6 +21,7 @@
                 <li><a href="/dashboard/">Dashboard</a></li>
                 <li><a href="/elections/" class="active">Elections</a></li>
                 <li><a href="/results/">Results</a></li>
+                <li><a href="/profile/">Profile</a></li>
             </ul>
             <div class="nav-user">
                 <span class="user-name" id="user-display"></span>
@@ -31,26 +34,46 @@
         <div class="page-header">
             <div class="section-header">
                 <div>
-                    <h1 class="section-title">Elections</h1>
-                    <p class="section-subtitle">Browse and participate in active elections</p>
+                    <h1 class="section-title">Village Election</h1>
+                    <p class="section-subtitle" id="village-info">Current active election for your village</p>
                 </div>
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="filters-bar">
-            <button class="filter-chip active" onclick="filterElections('all', this)">All</button>
-            <button class="filter-chip" onclick="filterElections('eligible', this)">Eligible for Me</button>
-            <button class="filter-chip" onclick="filterElections('national', this)">🏛️ National</button>
-            <button class="filter-chip" onclick="filterElections('state', this)">🏢 State</button>
-            <button class="filter-chip" onclick="filterElections('village', this)">🏘️ Village</button>
-            <button class="filter-chip" onclick="filterElections('upcoming', this)">Upcoming</button>
-            <button class="filter-chip" onclick="filterElections('completed', this)">Completed</button>
-        </div>
-
-        <div class="elections-grid" id="elections-grid">
+        <!-- Active Election View -->
+        <div id="active-election-container">
             <div class="spinner"></div>
         </div>
+
+        <!-- Candidate Detail Modal -->
+        <div id="candidate-modal" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width:800px">
+                <div class="modal-header">
+                    <h2 id="m-candidate-name">Candidate Name</h2>
+                    <button class="close-btn" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:24px">
+                        <div>
+                            <img id="m-candidate-photo" src="" alt="Candidate" style="width:100%;border-radius:var(--radius-md);border:1px solid var(--border)">
+                            <div style="margin-top:16px;text-align:center">
+                                <img id="m-party-photo" src="" alt="Party" style="height:60px">
+                                <p id="m-party-name" style="font-weight:bold;margin-top:8px"></p>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>Party Brochure</h3>
+                            <div id="m-brochure-container" style="border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:16px">
+                                <img id="m-brochure-img" src="" alt="Brochure" style="width:100%">
+                            </div>
+                            <h3>Manifesto</h3>
+                            <p id="m-manifesto" class="text-secondary"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="/static/js/api.js"></script>
@@ -59,80 +82,244 @@
 
         const user = getUser();
         document.getElementById('user-display').textContent = user?.first_name || '';
+        document.getElementById('village-info').textContent = `Current active elections for ${user?.village || 'your location'}`;
 
-        let allElections = [];
+        let currentElections = [];
+        let timerIntervals = [];
 
-        async function loadElections() {
-            const container = document.getElementById('elections-grid');
+        async function loadActiveElection() {
+            const container = document.getElementById('active-election-container');
             try {
-                const data = await getElections();
-                allElections = data.results || data;
-                renderElections(allElections);
+                // Fetch all active elections relevant to the user
+                const data = await getActiveElections();
+                const elections = data.results || data;
+                
+                if (!elections || elections.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">🗳️</div>
+                            <h3>No Active Election</h3>
+                            <p>There are currently no active elections for your location.</p>
+                            <a href="/results/" class="btn btn-secondary mt-2">View Past Results</a>
+                        </div>`;
+                    return;
+                }
+
+                currentElections = elections;
+                container.innerHTML = '';
+                
+                // Fetch vote status for all and render
+                for (const el of elections) {
+                    const statusData = await getVoteStatus(el.id);
+                    container.insertAdjacentHTML('beforeend', renderElectionCard(el, statusData.has_voted));
+                    startCountdown(el.id, el.created_at);
+                }
             } catch (e) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h3>Error</h3><p>Could not load elections.</p></div>';
+                container.innerHTML = '<div class="alert alert-danger">Error loading election data.</div>';
             }
         }
 
-        function renderElections(elections) {
-            const container = document.getElementById('elections-grid');
-            if (!elections || elections.length === 0) {
-                container.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">📭</div><h3>No Elections Found</h3><p>No elections match your filter criteria.</p></div>';
-                return;
-            }
-
-            container.innerHTML = elections.map(el => {
-                const isActive = el.is_active || el.status === 'active';
-                const statusClass = isActive ? 'active' : el.status;
-                const actionBtn = isActive
-                    ? `<a href="/vote/?id=${el.id}" class="btn btn-sm btn-primary">Vote Now →</a>`
-                    : el.status === 'completed'
-                        ? `<a href="/results/?id=${el.id}" class="btn btn-sm btn-secondary">View Results</a>`
-                        : `<span class="election-status upcoming">Upcoming</span>`;
-
-                return `
-                    <div class="election-card ${el.level}">
-                        <div style="display:flex;justify-content:space-between;align-items:start">
-                            <span class="election-level ${el.level}">${el.level}</span>
-                            <span class="election-status ${statusClass}">${el.status || 'active'}</span>
+        function renderElectionCard(el, hasVoted) {
+            let actionHtml = '';
+            if (hasVoted) {
+                actionHtml = `
+                    <div style="margin-top:32px;display:flex;justify-content:center;flex-direction:column;align-items:center;">
+                        <div class="alert alert-success" style="width:100%;max-width:500px;text-align:center;">
+                            ✅ You have already voted in this election.
                         </div>
-                        <h3 class="election-title">${el.title}</h3>
-                        <div class="election-meta">
-                            <span>📍 ${el.constituency || el.state || 'All India'}</span>
-                            <span>📅 ${formatDate(el.start_time)} — ${formatDate(el.end_time)}</span>
-                            <span>👥 ${el.total_candidates || 0} candidates</span>
-                        </div>
-                        <div style="margin-top:16px">${actionBtn}</div>
+                        <a href="/results/?id=${el.id}" class="btn btn-secondary mt-2">View Results →</a>
                     </div>
                 `;
-            }).join('');
-        }
-
-        async function filterElections(filter, btn) {
-            // Update active chip
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-
-            if (filter === 'eligible') {
-                try {
-                    const data = await getEligibleElections();
-                    renderElections(data);
-                } catch (e) { renderElections([]); }
-                return;
+            } else {
+                actionHtml = `
+                    <div style="margin-top:32px;display:flex;justify-content:center">
+                        <a href="/vote/?id=${el.id}" class="btn btn-lg btn-primary" style="min-width:200px">Proceed to Vote Now →</a>
+                    </div>
+                `;
             }
 
-            let filtered = allElections;
-            if (filter === 'national') filtered = allElections.filter(e => e.level === 'national');
-            else if (filter === 'state') filtered = allElections.filter(e => e.level === 'state');
-            else if (filter === 'village') filtered = allElections.filter(e => e.level === 'village');
-            else if (filter === 'upcoming') filtered = allElections.filter(e => e.status === 'upcoming');
-            else if (filter === 'completed') filtered = allElections.filter(e => e.status === 'completed');
+            return `
+                <div class="card" style="border-top: 4px solid var(--accent); margin-bottom: 24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:20px">
+                        <div>
+                            <span class="election-level ${el.level}" style="text-transform:uppercase;">${el.level} LEVEL</span>
+                            <h2 style="margin:10px 0">${el.title}</h2>
+                            <p class="text-secondary">${el.description || 'Election for your region'}</p>
+                        </div>
+                        <div class="countdown-container" style="background:var(--danger-bg);padding:15px;border-radius:var(--radius-md);text-align:center;min-width:150px">
+                            <div class="text-muted" style="font-size:0.75rem;font-weight:bold;margin-bottom:5px">ELECTION ENDS IN</div>
+                            <div id="countdown-${el.id}" style="font-size:1.5rem;font-weight:800;color:var(--danger);font-family:monospace">--:--:--</div>
+                        </div>
+                    </div>
 
-            renderElections(filtered);
+                    <div class="candidates-section">
+                        <h3 style="margin-bottom:16px">Candidates & Party Brochures</h3>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:20px">
+                            ${el.candidates && el.candidates.length > 0 ? 
+                                el.candidates.map(c => `
+                                    <div class="card stat-card" style="cursor:pointer;flex-direction:column;align-items:stretch" onclick="showCandidateDetails('${c.id}', '${el.id}')">
+                                        <div style="display:flex;gap:15px;align-items:center">
+                                            <img src="${c.photo || '/static/img/default-avatar.png'}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+                                            <div>
+                                                <h4 style="margin:0">${c.name}</h4>
+                                                <p class="text-muted" style="font-size:0.85rem">${c.party}</p>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                                            <span style="font-size:0.8rem;color:var(--accent)">View Brochure & Manifesto →</span>
+                                            <img src="${c.party_photo || '/static/img/party-placeholder.png'}" style="height:30px">
+                                        </div>
+                                    </div>
+                                `).join('') : 
+                                '<p class="text-muted">No candidates registered yet.</p>'
+                            }
+                        </div>
+                    </div>
+
+                    ${actionHtml}
+                </div>
+            `;
+        }
+
+        function startCountdown(id, createdAt) {
+            // Election duration is 1 day from creation
+            const created = new Date(createdAt).getTime();
+            const endTime = created + (24 * 60 * 60 * 1000);
+
+            function update() {
+                const now = new Date().getTime();
+                const diff = endTime - now;
+
+                if (diff <= 0) {
+                    document.getElementById(`countdown-${id}`).textContent = "EXPIRED";
+                    if (timerIntervals[id]) clearInterval(timerIntervals[id]);
+                    return;
+                }
+
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                document.getElementById(`countdown-${id}`).textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            update();
+            timerIntervals[id] = setInterval(update, 1000);
+        }
+
+        function showCandidateDetails(candidateId, electionId) {
+            const el = currentElections.find(e => e.id === electionId);
+            if (!el) return;
+            const c = el.candidates.find(cand => cand.id === candidateId);
+            if (!c) return;
+
+            document.getElementById('m-candidate-name').textContent = c.name;
+            document.getElementById('m-candidate-photo').src = c.photo || '/static/img/default-avatar.png';
+            document.getElementById('m-party-name').textContent = c.party;
+            document.getElementById('m-party-photo').src = c.party_photo || '/static/img/party-placeholder.png';
+            document.getElementById('m-brochure-img').src = c.party_brochure || '/static/img/brochure-placeholder.png';
+            document.getElementById('m-manifesto').textContent = c.manifesto || 'No manifesto provided.';
+            
+            document.getElementById('candidate-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('candidate-modal').classList.add('hidden');
         }
 
         function handleLogout() { clearAuth(); window.location.href = '/'; }
 
-        loadElections();
+        loadActiveElection();
+
+    </script>
+    <script src="/static/js/translations.js"></script>
+    <script src="/static/js/translate.js"></script>
+    <script src="/static/js/voice.js"></script>
+    <script>
+        function readElectionsList() {
+            const cards = document.querySelectorAll('.election-card');
+            if (cards.length === 0) {
+                return 'There are no elections to show right now.';
+            }
+            let text = `There are ${cards.length} elections. `;
+            cards.forEach((card, i) => {
+                const title = card.querySelector('.election-title')?.textContent || 'Unknown';
+                const level = card.querySelector('.election-level')?.textContent || '';
+                const status = card.querySelector('.election-status')?.textContent || '';
+                text += `Number ${i+1}: ${title}, ${level} level, status ${status}. `;
+            });
+            text += 'Say select election followed by the number to vote.';
+            return text;
+        }
+
+        VoiceEngine.init({
+            guideSteps: [
+                { text: 'This is the Elections page. Browse all available elections.', speak: 'This is the Elections page. You can browse all available elections here.' },
+                { text: 'Use the filter buttons to show National, State, or Village level elections.', speak: 'Use the filter buttons at the top, or say show national, show state, or show village to filter.' },
+                { text: 'Each election card shows the title, level, dates, and number of candidates.', speak: 'Each election card shows the title, level, dates, and number of candidates.' },
+                {
+                    text: 'I will now read out the available elections for you.',
+                    speak: '',
+                    action: () => {
+                        setTimeout(() => VoiceEngine.speak(readElectionsList()), 500);
+                    }
+                },
+                { text: 'Say "select election [number]" to open an election and vote.', speak: 'To vote, say select election followed by the number. For example, select election 1.' },
+            ],
+            commands: [
+                {
+                    patterns: ['show all', 'all elections'],
+                    handler: () => { filterElections('all', document.querySelector('.filter-chip')); VoiceEngine.speak('Showing all elections. ' + readElectionsList()); },
+                    description: 'Show all elections'
+                },
+                {
+                    patterns: ['show national', 'national elections', 'national'],
+                    handler: () => { filterElections('national', null); VoiceEngine.speak('Showing national elections. ' + readElectionsList()); },
+                    description: 'Filter national elections'
+                },
+                {
+                    patterns: ['show state', 'state elections', 'state'],
+                    handler: () => { filterElections('state', null); VoiceEngine.speak('Showing state elections. ' + readElectionsList()); },
+                    description: 'Filter state elections'
+                },
+                {
+                    patterns: ['show village', 'village elections', 'village'],
+                    handler: () => { filterElections('village', null); VoiceEngine.speak('Showing village elections. ' + readElectionsList()); },
+                    description: 'Filter village elections'
+                },
+                {
+                    patterns: ['eligible', 'my elections', 'eligible for me'],
+                    handler: () => { filterElections('eligible', null); VoiceEngine.speak('Showing elections you are eligible for.'); },
+                    description: 'Show eligible elections'
+                },
+                {
+                    patterns: ['read elections', 'list elections', 'what elections'],
+                    handler: () => VoiceEngine.speak(readElectionsList()),
+                    description: 'Read all elections aloud'
+                },
+                {
+                    patterns: [/select election (\d+)/, /election number (\d+)/, /open election (\d+)/, /vote in (\d+)/],
+                    handler: (text, match) => {
+                        const num = parseInt(match[1]) - 1;
+                        const cards = document.querySelectorAll('.election-card');
+                        if (cards[num]) {
+                            const voteLink = cards[num].querySelector('a.btn');
+                            if (voteLink) {
+                                const title = cards[num].querySelector('.election-title')?.textContent || '';
+                                VoiceEngine.speak('Opening ' + title);
+                                setTimeout(() => voteLink.click(), 800);
+                            } else {
+                                VoiceEngine.speak('That election is not open for voting yet.');
+                            }
+                        } else {
+                            VoiceEngine.speak('Election number ' + (num+1) + ' was not found.');
+                        }
+                    },
+                    description: 'Select an election by number'
+                }
+            ]
+        });
     </script>
 </body>
 </html>

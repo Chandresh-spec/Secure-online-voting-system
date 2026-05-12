@@ -40,12 +40,13 @@ function isLoggedIn() {
 
 // ─── Fetch Wrapper ───
 
-async function apiCall(endpoint, options = {}) {
+async function apiCall(endpoint, options = {}, isFormData = false) {
     const url = `${API_BASE}${endpoint}`;
-    const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
+    const headers = { ...options.headers };
+    
+    if (!isFormData) {
+        headers['Content-Type'] = 'application/json';
+    }
 
     const token = getAccessToken();
     if (token) {
@@ -110,6 +111,15 @@ async function refreshToken() {
 
 // ─── Auth API ───
 
+async function checkVoterRoll(voter_id, email) {
+    return apiCall('/auth/check-voter-roll/', { method: 'POST', body: JSON.stringify({ voter_id, email }) });
+}
+async function sendVoterOTP(voter_id, email) {
+    return apiCall('/auth/send-voter-otp/', { method: 'POST', body: JSON.stringify({ voter_id, email }) });
+}
+async function verifyVoterOTP(voter_id, email, otp) {
+    return apiCall('/auth/verify-voter-otp/', { method: 'POST', body: JSON.stringify({ voter_id, email, otp }) });
+}
 async function register(formData) {
     return apiCall('/auth/register/', {
         method: 'POST',
@@ -186,21 +196,30 @@ async function getCandidates(electionId) {
 }
 
 async function createCandidate(data) {
+    const isFormData = data instanceof FormData;
     return apiCall('/elections/candidates/', {
         method: 'POST',
-        body: JSON.stringify(data),
-    });
+        body: isFormData ? data : JSON.stringify(data),
+    }, isFormData);
 }
 
 // ─── Voting API ───
 
-async function castVote(electionId, candidateId) {
+async function castVote(electionId, candidateId, otpCode) {
     return apiCall('/voting/cast/', {
         method: 'POST',
         body: JSON.stringify({
             election_id: electionId,
             candidate_id: candidateId,
+            otp_code: otpCode,
         }),
+    });
+}
+
+async function sendVoteOTP() {
+    return apiCall('/voting/send-otp/', {
+        method: 'POST',
+        body: JSON.stringify({})
     });
 }
 
@@ -232,6 +251,22 @@ async function markAllRead() {
     return apiCall('/notifications/read-all/', { method: 'POST' });
 }
 
+// ─── Password Reset API ───
+
+async function requestPasswordReset(email) {
+    return apiCall('/auth/password-reset-request/', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+    });
+}
+
+async function confirmPasswordReset(email, otp, password) {
+    return apiCall('/auth/password-reset-confirm/', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp, password }),
+    });
+}
+
 // ─── Admin API ───
 
 async function getUsers(params = {}) {
@@ -239,8 +274,33 @@ async function getUsers(params = {}) {
     return apiCall(`/auth/users/${qs ? '?' + qs : ''}`);
 }
 
+// ─── Accounts API ───
+
 async function getDashboardStats() {
     return apiCall('/auth/dashboard-stats/');
+}
+
+async function getVoterRoll() {
+    return apiCall('/auth/voter-roll/');
+}
+async function createVoterRoll(data) {
+    return apiCall('/auth/voter-roll/', { method: 'POST', body: JSON.stringify(data) });
+}
+async function deleteVoterRoll(id) {
+    return apiCall(`/auth/voter-roll/${id}/`, { method: 'DELETE' });
+}
+async function updateVoterRoll(id, data) {
+    return apiCall(`/auth/voter-roll/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+async function getVillageAdmins() {
+    return apiCall('/auth/village-admins/');
+}
+async function createVillageAdmin(data) {
+    return apiCall('/auth/village-admins/', { method: 'POST', body: JSON.stringify(data) });
+}
+async function deleteVillageAdmin(id) {
+    return apiCall(`/auth/village-admins/${id}/`, { method: 'DELETE' });
 }
 
 // ─── UI Helpers ───
