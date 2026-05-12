@@ -28,6 +28,13 @@ class ElectionViewSet(viewsets.ModelViewSet):
         qs = Election.objects.all()
         user = self.request.user
 
+        if user.is_authenticated and user.role == 'voter':
+            from django.db.models import Q
+            q_national = Q(level='national')
+            q_state = Q(level='state', state__iexact=user.state)
+            q_village = Q(level='village', state__iexact=user.state, district__iexact=user.district, village__iexact=user.village)
+            qs = qs.filter(q_national | q_state | q_village)
+
         # Filter by query params
         level = self.request.query_params.get('level')
         stat = self.request.query_params.get('status')
@@ -38,18 +45,35 @@ class ElectionViewSet(viewsets.ModelViewSet):
         if stat:
             qs = qs.filter(status=stat)
         if state:
-            qs = qs.filter(state=state)
+            qs = qs.filter(state__iexact=state)
 
-        return qs
+        return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
+        user = self.request.user
+        level = serializer.validated_data.get('level')
+        village = serializer.validated_data.get('village')
+        
+        # Enforce 24-hour overwrite rule for village elections
+        if level == 'village' and village:
+            from datetime import timedelta
+            time_limit = timezone.now() - timedelta(hours=24)
+            recent_election = Election.objects.filter(
+                level='village',
+                village=village,
+                created_at__gte=time_limit
+            ).first()
+            
+            if recent_election:
+                recent_election.delete()
+
         serializer.save(created_by=self.request.user)
 
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return currently active elections."""
         now = timezone.now()
-        elections = Election.objects.filter(
+        elections = self.get_queryset().filter(
             start_time__lte=now, end_time__gte=now, status='active'
         )
         serializer = ElectionListSerializer(elections, many=True)
@@ -63,15 +87,23 @@ class ElectionViewSet(viewsets.ModelViewSet):
         elections = Election.objects.filter(
             start_time__lte=now, end_time__gte=now, status='active'
         )
+        # Helper for strict alignment
+        def normalize(loc):
+            return (loc or '').lower().replace(' ', '')
+
         # Filter by user's constituency
         eligible = []
         for el in elections:
             if el.level == 'national':
                 eligible.append(el)
-            elif el.level == 'state' and el.state == user.state:
+            elif el.level == 'state' and normalize(el.state) == normalize(user.state):
                 eligible.append(el)
-            elif el.level == 'village' and el.state == user.state and el.district == user.district and el.village == user.village:
-                eligible.append(el)
+            elif el.level == 'village':
+                state_match = normalize(el.state) == normalize(user.state)
+                dist_match = normalize(el.district) == normalize(user.district)
+                vill_match = normalize(el.village) == normalize(user.village)
+                if state_match and dist_match and vill_match:
+                    eligible.append(el)
         serializer = ElectionListSerializer(eligible, many=True)
         return Response(serializer.data)
 

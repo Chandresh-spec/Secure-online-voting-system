@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/voice.css">
     <link rel="stylesheet" href="/static/css/translate.css">
+    <style>
+        @keyframes facePulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(99,102,241,0.3); }
+            50%       { box-shadow: 0 4px 25px rgba(99,102,241,0.7); transform: scale(1.04); }
+        }
+    </style>
 </head>
 <body>
     <!-- Navbar -->
@@ -85,7 +91,7 @@
                 <h3 class="card-title">👤 Your Profile</h3>
                 <div class="flex gap-2">
                     <a href="/profile/" class="btn btn-sm btn-secondary">View Full Profile</a>
-                    <a href="/register-face/" class="btn btn-sm btn-primary" id="btn-register-face" style="display:none;">📷 Face ID</a>
+                    <a href="/register-face/" class="btn btn-sm btn-primary" id="btn-register-face">📷 Register Face ID</a>
                     <button class="btn btn-sm btn-secondary" onclick="toggleProfileEdit()">Edit</button>
                 </div>
             </div>
@@ -186,17 +192,23 @@
                 document.getElementById('p-district').textContent = profile.district || '—';
                 document.getElementById('p-village').textContent = profile.village || '—';
 
+                const faceBtn = document.getElementById('btn-register-face');
                 if (!profile.is_verified) {
                     document.getElementById('verify-alert').classList.remove('hidden');
+                    // Show button but disabled with tooltip
+                    faceBtn.style.cssText = 'opacity:0.45;cursor:not-allowed;pointer-events:none;';
+                    faceBtn.title = 'Verify your identity first to enable Face ID registration';
+                    faceBtn.innerHTML = '📷 Face ID (verify first)';
                 } else {
-                    const faceBtn = document.getElementById('btn-register-face');
-                    faceBtn.style.display = 'inline-flex';
                     if (profile.has_face_registered) {
                         faceBtn.innerHTML = '✅ Face ID Set';
                         faceBtn.classList.remove('btn-primary');
                         faceBtn.classList.add('btn-success');
                         faceBtn.href = 'javascript:void(0)';
-                        faceBtn.onclick = () => alert('Your Face ID is already registered. If you wish to re-register, please ask an administrator to reset it.');
+                        faceBtn.onclick = () => showToast('Face ID is already registered. Ask an admin to reset it if needed.', 'info');
+                    } else {
+                        // Pulse animation to draw attention
+                        faceBtn.style.animation = 'facePulse 2s ease-in-out infinite';
                     }
                 }
 

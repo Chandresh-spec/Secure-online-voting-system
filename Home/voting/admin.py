@@ -1,16 +1,14 @@
 from django.contrib import admin
-from .models import VoteRecord, Vote
-
-
-@admin.register(VoteRecord)
-class VoteRecordAdmin(admin.ModelAdmin):
-    list_display = ['user', 'election', 'voted_at']
-    list_filter = ['election']
-    search_fields = ['user__email']
-
+from .models import Vote, VoteRecord
 
 @admin.register(Vote)
 class VoteAdmin(admin.ModelAdmin):
-    list_display = ['election', 'candidate', 'vote_hash', 'timestamp']
-    list_filter = ['election']
-    readonly_fields = ['vote_hash']
+    list_display = ('vote_hash', 'election', 'candidate', 'cast_at')
+    list_filter = ('election',)
+    search_fields = ('vote_hash', 'candidate__name')
+
+@admin.register(VoteRecord)
+class VoteRecordAdmin(admin.ModelAdmin):
+    list_display = ('user', 'election', 'created_at')
+    list_filter = ('election',)
+    search_fields = ('user__username', 'user__email', 'election__title')

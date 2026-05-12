@@ -20,6 +20,7 @@ urlpatterns = [
 
     # Frontend pages
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    path('admin-login/', TemplateView.as_view(template_name='admin_login.html'), name='admin_login'),
     path('dashboard/', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
     path('elections/', TemplateView.as_view(template_name='elections.html'), name='elections'),
     path('vote/', TemplateView.as_view(template_name='vote.html'), name='vote'),

@@ -2,6 +2,122 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 import uuid
 
+# ─── Location Hierarchy ───
+
+class Constituency(models.Model):
+    name = models.CharField(max_length=150)
+    state = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.name} ({self.state})"
+
+class Assembly(models.Model):
+    name = models.CharField(max_length=150)
+    constituency = models.ForeignKey(Constituency, on_delete=models.CASCADE, related_name='assemblies')
+
+    def __str__(self):
+        return f"{self.name} - {self.constituency.name}"
+
+class Village(models.Model):
+    name = models.CharField(max_length=150)
+    assembly = models.ForeignKey(Assembly, on_delete=models.CASCADE, related_name='villages')
+
+    def __str__(self):
+        return f"{self.name} - {self.assembly.name}"
+
+class Booth(models.Model):
+    name = models.CharField(max_length=150)
+    village = models.ForeignKey(Village, on_delete=models.CASCADE, related_name='booths')
+
+    def __str__(self):
+        return f"{self.name} ({self.village.name})"
+
+# ─── Voter / Admin Rolls ───
+
+class VoterRoll(models.Model):
+    """
+    Local village voter roll — pre-populated by election officers.
+    A citizen can only register if their voter_id + email exist here.
+    """
+    voter_id = models.CharField(max_length=30, unique=True)
+    email = models.EmailField()
+    mobile_number = models.CharField(max_length=15, blank=True)
+    full_name = models.CharField(max_length=150)
+    village = models.CharField(max_length=100)
+    district = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100)
+    nation = models.CharField(max_length=100, default='India')
+    date_of_birth = models.DateField(null=True, blank=True)
+    is_registered = models.BooleanField(
+        default=False,
+        help_text='Becomes True once the voter completes online registration.'
+    )
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('officer', 'Election Officer'),
+        ('voter', 'Voter'),
+    )
+    designated_role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        default='voter',
+        help_text='If set to Admin, the user automatically becomes the Village Admin upon registration.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'voter_rolls'
+        indexes = [
+            models.Index(fields=['voter_id']),
+            models.Index(fields=['email']),
+            models.Index(fields=['village', 'state']),
+        ]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.voter_id}) — {self.village}, {self.state}"
+
+
+class VillageAdmin(models.Model):
+    """
+    Dedicated table for Village Admins to avoid mixing them with VoterRoll.
+    Functionality matches VoterRoll but strictly for administrative roles.
+    """
+    admin_id = models.CharField(max_length=30, unique=True, verbose_name="Admin ID")
+    email = models.EmailField()
+    mobile_number = models.CharField(max_length=15, blank=True)
+    full_name = models.CharField(max_length=150)
+    village = models.CharField(max_length=100)
+    district = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100)
+    nation = models.CharField(max_length=100, default='India')
+    date_of_birth = models.DateField(null=True, blank=True)
+    is_registered = models.BooleanField(
+        default=False,
+        help_text='Becomes True once the admin completes online registration.'
+    )
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('officer', 'Election Officer'),
+    )
+    designated_role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        default='admin',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'village_admins'
+        indexes = [
+            models.Index(fields=['admin_id']),
+            models.Index(fields=['email']),
+            models.Index(fields=['village', 'state']),
+        ]
+
+    def __str__(self):
+        return f"Admin: {self.full_name} ({self.admin_id}) — {self.village}, {self.state}"
+
+# ─── Custom User Model ───
 
 class User(AbstractUser):
     """Custom user model with voter-specific fields and role support."""
@@ -15,7 +131,7 @@ class User(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=15, blank=True)
-    voter_id = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    voter_id = models.CharField(max_length=30, unique=True, blank=True, null=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='voter')
     state = models.CharField(max_length=100, blank=True)
     district = models.CharField(max_length=100, blank=True)
@@ -23,11 +139,30 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     date_of_birth = models.DateField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
+    face_encoding = models.BinaryField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Location hierarchy FK references (optional, for election scoping)
+    booth = models.ForeignKey(Booth, on_delete=models.SET_NULL, null=True, blank=True)
+    village_ref = models.ForeignKey(Village, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    assembly = models.ForeignKey(Assembly, on_delete=models.SET_NULL, null=True, blank=True)
+    constituency = models.ForeignKey(Constituency, on_delete=models.SET_NULL, null=True, blank=True)
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+
+    # To resolve reverse accessor conflicts with Django's default User model:
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='custom_user_set_v2',
+        blank=True,
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='custom_user_set_v2',
+        blank=True,
+    )
 
     class Meta:
         db_table = 'users'

@@ -5,7 +5,7 @@ from .models import Election, Candidate
 class CandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Candidate
-        fields = ['id', 'name', 'party', 'symbol', 'photo', 'manifesto', 'election', 'created_at']
+        fields = ['id', 'name', 'party', 'symbol', 'photo', 'party_photo', 'party_brochure', 'manifesto', 'election', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -40,9 +40,9 @@ class ElectionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Election
         fields = [
-            'id', 'title', 'level', 'constituency', 'state',
+            'id', 'title', 'level', 'constituency', 'state', 'district', 'village',
             'start_time', 'end_time', 'status', 'is_active',
-            'total_candidates',
+            'total_candidates', 'created_at',
         ]
 
     def get_total_candidates(self, obj):
