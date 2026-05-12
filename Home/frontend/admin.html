@@ -85,6 +85,7 @@
             </div>
             <div class="table-wrapper"><table><thead><tr><th>Voter ID</th><th>Full Name</th><th>Email</th><th>Village</th><th>Registered</th><th>Actions</th></tr></thead>
             <tbody id="roll-tbody"><tr><td colspan="6" class="text-center"><div class="spinner"></div></td></tr></tbody></table></div>
+            <div id="voter-pagination" class="pagination-container" style="display:flex; justify-content:center; gap:10px; margin-top:15px; align-items:center;"></div>
         </div>
     </div>
 
@@ -208,10 +209,11 @@
                 </select>
             </div>
             <div id="level-fields-village" class="form-row">
-                <div class="form-group"><label class="form-label">Village</label><input type="text" id="el-village" class="form-input"></div>
-                <div class="form-group"><label class="form-label">State</label><input type="text" id="el-state-village" class="form-input"></div>
+                <div class="form-group"><label class="form-label">Village</label><input type="text" id="el-village" class="form-input" readonly style="background:#2a2a35;cursor:not-allowed;"></div>
+                <div class="form-group"><label class="form-label">District</label><input type="text" id="el-district-village" class="form-input" readonly style="background:#2a2a35;cursor:not-allowed;"></div>
+                <div class="form-group"><label class="form-label">State</label><input type="text" id="el-state-village" class="form-input" readonly style="background:#2a2a35;cursor:not-allowed;"></div>
             </div>
-            <div id="level-fields-state" class="form-group" style="display:none"><label class="form-label">State</label><input type="text" id="el-state" class="form-input"></div>
+            <div id="level-fields-state" class="form-group" style="display:none"><label class="form-label">State</label><input type="text" id="el-state" class="form-input" readonly style="background:#2a2a35;cursor:not-allowed;"></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Start Time</label><input type="datetime-local" id="el-start" class="form-input" required></div>
                 <div class="form-group"><label class="form-label">End Time</label><input type="datetime-local" id="el-end" class="form-input" required></div>
@@ -284,6 +286,9 @@
 
     /* ── VOTER DATA CACHE ── */
     let voterCache = [];
+    let currentVoterPage = 1;
+    const votersPerPage = 50;
+    let filteredVoters = [];
 
     /* ── ELECTION DATA CACHE ── */
     let electionCache = [];
@@ -294,9 +299,11 @@
         try {
             const roll = await getVoterRoll();
             voterCache = roll;
+            filteredVoters = roll;
             document.getElementById('stat-roll').textContent = roll.length || 0;
             document.getElementById('stat-registered').textContent = roll.filter(v => v.is_registered).length || 0;
-            renderVoterTable(roll);
+            currentVoterPage = 1;
+            renderVoterTable();
         } catch(e) { console.error(e); }
 
         // Elections
@@ -342,10 +349,21 @@
     }
 
     /* ── RENDER VOTER TABLE ── */
-    function renderVoterTable(list) {
+    function renderVoterTable() {
         const tb = document.getElementById('roll-tbody');
-        if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No voters found.</td></tr>'; return; }
-        tb.innerHTML = list.map(v => `<tr>
+        const list = filteredVoters;
+        
+        if (!list.length) { 
+            tb.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No voters found.</td></tr>'; 
+            document.getElementById('voter-pagination').innerHTML = '';
+            return; 
+        }
+
+        const startIndex = (currentVoterPage - 1) * votersPerPage;
+        const endIndex = startIndex + votersPerPage;
+        const pageData = list.slice(startIndex, endIndex);
+
+        tb.innerHTML = pageData.map(v => `<tr>
             <td><strong>${v.voter_id}</strong></td><td>${v.full_name}</td><td>${v.email}</td>
             <td>${v.village||''}</td>
             <td><span class="badge badge-bool ${v.is_registered}">${v.is_registered?'Yes':'No'}</span></td>
@@ -355,18 +373,54 @@
                 <button class="btn btn-sm btn-secondary" style="color:var(--error)" onclick="deleteVoter(${v.id})" title="Delete">🗑️</button>
             </td>
         </tr>`).join('');
+
+        renderVoterPagination();
+    }
+
+    function renderVoterPagination() {
+        const container = document.getElementById('voter-pagination');
+        const totalPages = Math.ceil(filteredVoters.length / votersPerPage);
+        
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = `<button class="btn btn-sm btn-secondary" ${currentVoterPage === 1 ? 'disabled' : ''} onclick="changeVoterPage(${currentVoterPage - 1})">Previous</button>`;
+        
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentVoterPage - 2 && i <= currentVoterPage + 2)) {
+                html += `<button class="btn btn-sm ${i === currentVoterPage ? 'btn-primary' : 'btn-secondary'}" onclick="changeVoterPage(${i})">${i}</button>`;
+            } else if (i === currentVoterPage - 3 || i === currentVoterPage + 3) {
+                html += `<span>...</span>`;
+            }
+        }
+
+        html += `<button class="btn btn-sm btn-secondary" ${currentVoterPage === totalPages ? 'disabled' : ''} onclick="changeVoterPage(${currentVoterPage + 1})">Next</button>`;
+        
+        container.innerHTML = html;
+    }
+
+    function changeVoterPage(p) {
+        currentVoterPage = p;
+        renderVoterTable();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     /* ── SEARCH / FILTER ── */
     function filterVoters() {
         const q = document.getElementById('voter-search').value.toLowerCase().trim();
-        if (!q) { renderVoterTable(voterCache); return; }
-        const filtered = voterCache.filter(v =>
-            v.voter_id.toLowerCase().includes(q) ||
-            v.full_name.toLowerCase().includes(q) ||
-            v.email.toLowerCase().includes(q)
-        );
-        renderVoterTable(filtered);
+        if (!q) { 
+            filteredVoters = voterCache; 
+        } else {
+            filteredVoters = voterCache.filter(v =>
+                v.voter_id.toLowerCase().includes(q) ||
+                v.full_name.toLowerCase().includes(q) ||
+                v.email.toLowerCase().includes(q)
+            );
+        }
+        currentVoterPage = 1;
+        renderVoterTable();
     }
 
     /* ── VIEW VOTER ── */
@@ -577,17 +631,26 @@
     }
     function prefillLocationFields() {
         document.getElementById('el-village').value = user.village||'';
+        document.getElementById('el-district-village').value = user.district||'';
         document.getElementById('el-state-village').value = user.state||'';
         try { document.getElementById('el-state').value = user.state||''; } catch(e){}
     }
     async function handleCreateElection(ev) {
         ev.preventDefault(); const btn = ev.target.querySelector('button[type="submit"]'); btn.disabled=true; btn.textContent='Creating...';
         const level = document.getElementById('el-level').value;
-        let elState='', elVillage='';
-        if (level==='village') { elVillage=document.getElementById('el-village').value.trim(); elState=document.getElementById('el-state-village').value.trim(); if(!elVillage||!elState){showToast('Village/State required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} }
-        else if (level==='state') { elState=document.getElementById('el-state').value.trim(); if(!elState){showToast('State required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} }
+        let elState='', elVillage='', elDistrict='';
+        if (level==='village') { 
+            elVillage=document.getElementById('el-village').value.trim(); 
+            elDistrict=document.getElementById('el-district-village').value.trim();
+            elState=document.getElementById('el-state-village').value.trim(); 
+            if(!elVillage || !elDistrict || !elState){showToast('Village, District and State are required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} 
+        }
+        else if (level==='state') { 
+            elState=document.getElementById('el-state').value.trim(); 
+            if(!elState){showToast('State required','error'); btn.disabled=false; btn.textContent='Create Election'; return;} 
+        }
         try {
-            await createElection({ title:document.getElementById('el-title').value, description:document.getElementById('el-desc').value, level, constituency:level==='village'?elVillage:(level==='state'?elState:'National'), state:elState, village:elVillage, start_time:new Date(document.getElementById('el-start').value).toISOString(), end_time:new Date(document.getElementById('el-end').value).toISOString(), status:'active' });
+            await createElection({ title:document.getElementById('el-title').value, description:document.getElementById('el-desc').value, level, constituency:level==='village'?elVillage:(level==='state'?elState:'National'), district:elDistrict, state:elState, village:elVillage, start_time:new Date(document.getElementById('el-start').value).toISOString(), end_time:new Date(document.getElementById('el-end').value).toISOString(), status:'active' });
             showToast('Election created!'); ev.target.reset(); closeElectionModal(); loadAdminData();
         } catch(e) { showToast('Error creating election','error'); }
         finally { btn.disabled=false; btn.textContent='Create Election'; }

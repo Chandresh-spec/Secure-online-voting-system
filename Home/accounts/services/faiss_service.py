@@ -28,7 +28,7 @@ ID_MAP_FILE_PATH = os.path.join(settings.BASE_DIR, 'media', 'voter_faces_map.npy
 # L2 distance threshold for normalized FaceNet embeddings.
 # Lower = stricter. 0.60 is strict enough to reject different people
 # while being lenient enough for the same person under varied lighting.
-SIMILARITY_THRESHOLD = 0.60
+SIMILARITY_THRESHOLD = 0.90
 
 
 class FAISSService:
@@ -57,7 +57,8 @@ class FAISSService:
     def has_face(self, voter_id):
         """Check if a specific voter_id has a registered face."""
         if MOCK_MODE:
-            return True
+            # Only return True if the face was actually mock-registered
+            return hasattr(self, 'mock_id_map') and voter_id in self.mock_id_map
         self._load_index()
         return voter_id in self.id_map
 
@@ -84,13 +85,13 @@ class FAISSService:
             img.save(temp_path, 'JPEG', quality=95)
 
             # Generate embedding using FaceNet
-            # enforce_detection=False to avoid crashes with webcam images
-            # We still check if a face was found via the response
+            # Use mtcnn for robust face cropping based on landmarks (ignores background)
             embedding_objs = DeepFace.represent(
                 img_path=temp_path,
                 model_name="Facenet",
-                enforce_detection=False,
-                detector_backend="opencv"
+                enforce_detection=True,
+                detector_backend="mtcnn",
+                align=True
             )
 
             if len(embedding_objs) == 0:
@@ -162,11 +163,11 @@ class FAISSService:
     def verify_face(self, voter_id, image_bytes):
         """Verify if the LIVE captured face matches the registered voter_id."""
         if MOCK_MODE:
-            logger.info(f"[MOCK] Face verified for {voter_id}")
+            logger.info(f"[MOCK] Face verification failed for {voter_id} (MOCK_MODE always denies for safety)")
             return {
-                'verified': True,
-                'distance': 0.1,
-                'message': 'Face verified successfully (MOCK).'
+                'verified': False,
+                'distance': 0.99,
+                'message': 'Face verification requires the AI models to be installed. Please install DeepFace and FAISS.'
             }
 
         if not DeepFace or not faiss:

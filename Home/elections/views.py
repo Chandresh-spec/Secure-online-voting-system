@@ -28,6 +28,13 @@ class ElectionViewSet(viewsets.ModelViewSet):
         qs = Election.objects.all()
         user = self.request.user
 
+        if user.is_authenticated and user.role == 'voter':
+            from django.db.models import Q
+            q_national = Q(level='national')
+            q_state = Q(level='state', state__iexact=user.state)
+            q_village = Q(level='village', state__iexact=user.state, district__iexact=user.district, village__iexact=user.village)
+            qs = qs.filter(q_national | q_state | q_village)
+
         # Filter by query params
         level = self.request.query_params.get('level')
         stat = self.request.query_params.get('status')
@@ -38,9 +45,9 @@ class ElectionViewSet(viewsets.ModelViewSet):
         if stat:
             qs = qs.filter(status=stat)
         if state:
-            qs = qs.filter(state=state)
+            qs = qs.filter(state__iexact=state)
 
-        return qs
+        return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -66,7 +73,7 @@ class ElectionViewSet(viewsets.ModelViewSet):
     def active(self, request):
         """Return currently active elections."""
         now = timezone.now()
-        elections = Election.objects.filter(
+        elections = self.get_queryset().filter(
             start_time__lte=now, end_time__gte=now, status='active'
         )
         serializer = ElectionListSerializer(elections, many=True)

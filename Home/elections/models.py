@@ -1,11 +1,18 @@
 from django.db import models
-from django.conf import settings
+from django.utils import timezone
 import uuid
+from accounts.models import User, Constituency, Assembly, Village
+
+
+class Party(models.Model):
+    name = models.CharField(max_length=150)
+    symbol = models.ImageField(upload_to='parties/', null=True, blank=True)
+
+    def __str__(self):
+        return self.name
 
 
 class Election(models.Model):
-    """Election model supporting National, State, and Village levels."""
-
     LEVEL_CHOICES = (
         ('national', 'National'),
         ('state', 'State'),
@@ -19,62 +26,56 @@ class Election(models.Model):
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    level = models.CharField(max_length=10, choices=LEVEL_CHOICES)
-    constituency = models.CharField(max_length=200, blank=True)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='village')
+
+    # Location scoping (string-based to match User model)
+    constituency = models.CharField(max_length=150, blank=True)
     state = models.CharField(max_length=100, blank=True)
     district = models.CharField(max_length=100, blank=True)
     village = models.CharField(max_length=100, blank=True)
+
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='upcoming')
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, related_name='created_elections'
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'elections'
-        ordering = ['-start_time']
+        ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['level', 'status']),
-            models.Index(fields=['state', 'district']),
-            models.Index(fields=['start_time', 'end_time']),
+            models.Index(fields=['status']),
+            models.Index(fields=['level']),
+            models.Index(fields=['state', 'district', 'village']),
         ]
-
-    def __str__(self):
-        return f"{self.title} ({self.get_level_display()})"
 
     @property
     def is_active(self):
-        from django.utils import timezone
         now = timezone.now()
-        return self.start_time <= now <= self.end_time
+        return self.status == 'active' and self.start_time <= now <= self.end_time
+
+    def __str__(self):
+        return f"{self.title} ({self.level})"
 
 
 class Candidate(models.Model):
-    """Candidate in an election."""
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=150)
     election = models.ForeignKey(Election, on_delete=models.CASCADE, related_name='candidates')
-    name = models.CharField(max_length=200)
-    party = models.CharField(max_length=200)
-    symbol = models.CharField(max_length=100, blank=True)
-    photo = models.ImageField(upload_to='candidates/', blank=True, null=True)
-    party_photo = models.ImageField(upload_to='parties/', blank=True, null=True)
-    party_brochure = models.ImageField(upload_to='brochures/', blank=True, null=True)
+    party = models.ForeignKey(Party, on_delete=models.SET_NULL, null=True, blank=True)
+    symbol = models.ImageField(upload_to='candidates/symbols/', null=True, blank=True)
+    photo = models.ImageField(upload_to='candidates/', null=True, blank=True)
+    party_photo = models.ImageField(upload_to='candidates/party_photos/', null=True, blank=True)
+    party_brochure = models.FileField(upload_to='candidates/brochures/', null=True, blank=True)
     manifesto = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'candidates'
-        ordering = ['name']
-        indexes = [
-            models.Index(fields=['election']),
-        ]
 
     def __str__(self):
-        return f"{self.name} - {self.party} ({self.election.title})"
+        return f"{self.name} - {self.election.title}"

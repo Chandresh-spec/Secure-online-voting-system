@@ -23,7 +23,7 @@ class Command(BaseCommand):
         password = options.get('password') or input("Enter Password: ")
         
         # Location info
-        village = options.get('village') or input("Enter Village Name (e.g. Indiranagar): ")
+        village_name = options.get('village') or input("Enter Village Name (e.g. Indiranagar): ")
         district = options.get('district') or input("Enter District (e.g. Bangalore): ")
         state = options.get('state') or input("Enter State (e.g. Karnataka): ")
 
@@ -37,9 +37,9 @@ class Command(BaseCommand):
             email=email,
             password=password,
             first_name="Admin",
-            last_name=village,
+            last_name=village_name,
             role="admin",
-            village=village,
+            village=village_name,
             district=district,
             state=state,
             is_verified=True,          # Pre-verify admins
@@ -47,7 +47,7 @@ class Command(BaseCommand):
             is_superuser=True          # Complete superuser power
         )
 
-        self.stdout.write(self.style.SUCCESS(f"\n[SUCCESS] Village Admin '{username}' created successfully for '{village}'!"))
+        self.stdout.write(self.style.SUCCESS(f"\n[SUCCESS] Village Admin '{username}' created successfully for '{village_name}'!"))
         self.stdout.write("You can now log in at http://127.0.0.1:8000/login/ with:")
         self.stdout.write(f"  Email:    {email}")
         self.stdout.write(f"  Password: {password}")
