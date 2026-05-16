@@ -303,6 +303,32 @@ async function deleteVillageAdmin(id) {
     return apiCall(`/auth/village-admins/${id}/`, { method: 'DELETE' });
 }
 
+// ─── Registration Request API ───
+
+async function submitRegistrationRequest(data) {
+    return apiCall('/auth/registration-requests/submit/', {
+        method: 'POST', body: JSON.stringify(data)
+    });
+}
+async function getRegistrationRequests(status) {
+    return apiCall(`/auth/registration-requests/${status ? '?status='+status : ''}`);
+}
+async function forwardRegistrationRequest(id, notes) {
+    return apiCall(`/auth/registration-requests/${id}/forward/`, {
+        method: 'POST', body: JSON.stringify({ notes })
+    });
+}
+async function approveRegistrationRequest(id, notes) {
+    return apiCall(`/auth/registration-requests/${id}/approve/`, {
+        method: 'POST', body: JSON.stringify({ notes })
+    });
+}
+async function rejectRegistrationRequest(id, notes) {
+    return apiCall(`/auth/registration-requests/${id}/reject/`, {
+        method: 'POST', body: JSON.stringify({ notes })
+    });
+}
+
 // ─── UI Helpers ───
 
 function showToast(message, type = 'success') {
