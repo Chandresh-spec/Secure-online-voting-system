@@ -168,6 +168,19 @@ class VillageAdminAPIView(APIView):
         if request.user.role not in ('admin', 'officer'):
             return Response(status=status.HTTP_403_FORBIDDEN)
         data = request.data.copy()
+        
+        # Enforce exactly one admin per village
+        village = data.get('village')
+        district = data.get('district')
+        state = data.get('state')
+        
+        if village and district and state:
+            if VillageAdmin.objects.filter(village=village, district=district, state=state).exists():
+                return Response(
+                    {'detail': 'A Village Admin already exists for this village. Only one admin per village is permitted.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         serializer = VillageAdminSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()

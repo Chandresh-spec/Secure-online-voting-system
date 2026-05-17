@@ -60,6 +60,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         if user.role == 'admin':
             user.is_staff = True
             user.is_superuser = True
+        elif user.role == 'officer':
+            user.is_staff = True
             
         user.save()
         # Mark this roll entry as registered

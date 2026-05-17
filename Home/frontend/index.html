@@ -16,19 +16,20 @@
     display: flex; align-items: center; gap: 10px; margin-bottom: 24px;
 }
 .prog-back {
-    background: none; border: none; color: var(--text-muted, #a38d82);
-    font-size: 1.1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
-    transition: all .2s;
+    background: rgba(200,134,42,.08); border: 1px solid rgba(200,134,42,.15); color: var(--accent-light, #E0A040);
+    font-size: 1.1rem; cursor: pointer; padding: 6px 10px; border-radius: 8px;
+    transition: all .25s ease;
 }
-.prog-back:hover { background: rgba(74,46,36,.08); color: var(--text-primary, #4a2e24); }
-.prog-bar-wrap { flex:1; height:3px; background: rgba(74,46,36,.1); border-radius:2px; overflow:hidden; }
+.prog-back:hover { background: rgba(200,134,42,.18); color: #fff; transform: translateX(-2px); }
+.prog-bar-wrap { flex:1; height:5px; background: rgba(200,134,42,.12); border-radius:3px; overflow:hidden; }
 .prog-bar-fill {
     height:100%;
-    background: linear-gradient(90deg, #c14336, #d6594d);
-    border-radius:2px;
+    background: linear-gradient(90deg, #C8862A, #E0A040, #F0C060);
+    border-radius:3px;
     transition: width .5s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 0 8px rgba(224,160,64,.4);
 }
-.prog-label { font-size:.72rem; color:var(--text-muted, #a38d82); white-space:nowrap; font-weight:600; }
+.prog-label { font-size:.72rem; color: var(--accent-light, #E0A040); white-space:nowrap; font-weight:700; letter-spacing: 0.5px; }
 
 /* ── Question viewport ── */
 .q-viewport { position:relative; min-height:300px; }
@@ -41,59 +42,86 @@
 .q-slide.exiting { opacity:0; transform:translateX(-60px); pointer-events:none; }
 
 /* ── Question UI ── */
-.q-icon { font-size:2rem; margin-bottom:8px; }
-.q-title { font-size:1.2rem; font-weight:700; color: var(--text-primary, #4a2e24); margin-bottom:5px; line-height:1.4; }
-.q-hint  { font-size:.78rem; color: var(--text-secondary, #7a5a4a); margin-bottom:18px; line-height:1.5; }
+.q-icon {
+    font-size:2.2rem; margin-bottom:10px;
+    display:inline-block;
+    animation: floatIcon 2.5s ease-in-out infinite;
+}
+@keyframes floatIcon { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.q-title { font-size:1.25rem; font-weight:700; color: var(--text-primary, #F5EEE4); margin-bottom:5px; line-height:1.4; }
+.q-hint  { font-size:.78rem; color: var(--text-secondary, #C4AE96); margin-bottom:18px; line-height:1.5; }
+
+/* ══ FIXED: Dark text on light inputs so typed text is VISIBLE ══ */
 .q-input {
     width:100%; box-sizing:border-box;
-    background: #ffffff; border:1.5px solid #cccccc;
-    border-radius:12px; padding:14px 18px; font-size:1rem; color: var(--text-primary, #4a2e24);
-    outline:none; transition: border-color .2s, box-shadow .2s;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    background: var(--bg-secondary, #251A13);
+    border:1.5px solid var(--border, #3D2E22);
+    border-radius:12px; padding:14px 18px; font-size:1rem;
+    color: var(--text-primary, #F5EEE4);
+    outline:none;
+    transition: border-color .25s, box-shadow .25s, background .25s;
+    font-family: 'Inter', sans-serif;
 }
-.q-input:focus { border-color: var(--accent, #c14336); box-shadow:0 0 0 3px rgba(193,67,54,.18); }
-.q-input[readonly] { background: rgba(193,67,54,.04); border-color: rgba(193,67,54,.2); color: var(--text-muted, #a38d82); cursor:default; }
+.q-input::placeholder { color: var(--text-muted, #8A7060); }
+.q-input:focus {
+    border-color: var(--accent, #C8862A);
+    background: var(--bg-card, #2D2218);
+    box-shadow: 0 0 0 3px rgba(200,134,42,.25), 0 4px 16px rgba(200,134,42,.1);
+}
+.q-input[readonly] {
+    background: rgba(200,134,42,.06); border-color: rgba(200,134,42,.2);
+    color: var(--text-muted, #8A7060); cursor:default;
+}
 .q-input.otp  { text-align:center; font-size:2rem; letter-spacing:18px; font-weight:700; }
 .q-input.pass { font-size:1.2rem; letter-spacing:4px; }
 .q-input.upper { text-transform:uppercase; letter-spacing:2px; }
 .q-msg { margin-top:8px; min-height:18px; font-size:.78rem; }
-.q-msg.ok  { color: var(--success, #5e7a4b); }
-.q-msg.err { color: var(--danger, #b03a2e); }
-.q-msg.inf { color: var(--info, #4b6a8a); }
+.q-msg.ok  { color: #5DC888; }
+.q-msg.err { color: #FF6B5A; }
+.q-msg.inf { color: #60A5E8; }
 
-/* ── Next button ── */
-.q-footer { display:flex; align-items:center; gap:10px; margin-top:20px; }
+/* ── Next button — Premium gold gradient ── */
+.q-footer { display:flex; align-items:center; gap:10px; margin-top:22px; }
 .q-btn {
-    background: var(--gradient-1, linear-gradient(to bottom, #d14d3f 0%, #b1382b 100%));
-    color:#fff; border:1px solid #8c2a1f; border-radius:10px;
-    padding:12px 28px; font-size:.95rem; font-weight:600; cursor:pointer;
+    background: linear-gradient(135deg, #C8862A 0%, #E0A040 50%, #C8862A 100%);
+    background-size: 200% 200%;
+    color:#fff; border:1px solid rgba(224,160,64,.3); border-radius:12px;
+    padding:13px 30px; font-size:.95rem; font-weight:700; cursor:pointer;
     display:flex; align-items:center; gap:8px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.2);
-    text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
-    transition: transform .15s, box-shadow .15s, opacity .2s;
+    box-shadow: 0 4px 16px rgba(200,134,42,.35);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: transform .2s, box-shadow .2s, background-position .4s;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.3px;
 }
-.q-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.2), 0 4px 8px rgba(193,67,54,.4); }
+.q-btn:hover:not(:disabled) {
+    transform:translateY(-2px);
+    box-shadow: 0 6px 24px rgba(200,134,42,.5);
+    background-position: 100% 0;
+}
 .q-btn:active { transform:scale(.97); }
-.q-btn:disabled { opacity:.5; cursor:not-allowed; }
-.q-enter-hint { font-size:.7rem; color: var(--text-muted, #a38d82); }
+.q-btn:disabled { opacity:.45; cursor:not-allowed; }
+.q-enter-hint { font-size:.7rem; color: var(--text-muted, #8A7060); }
 .q-enter-hint kbd {
-    background: rgba(74,46,36,.06); border:1px solid rgba(74,46,36,.15);
-    border-radius:4px; padding:1px 5px; font-size:.65rem; color: var(--text-secondary, #7a5a4a);
+    background: rgba(200,134,42,.08); border:1px solid rgba(200,134,42,.2);
+    border-radius:4px; padding:1px 5px; font-size:.65rem; color: var(--accent-light, #E0A040);
 }
 
-/* ── Verified strip ── */
+/* ── Verified strip — glowing green ── */
 .verified-strip {
     display:flex; align-items:center; gap:10px;
-    background: var(--success-bg, rgba(94,122,75,.15)); border:1px solid rgba(94,122,75,.3);
-    border-radius:10px; padding:10px 14px; margin-bottom:14px;
-    font-size:.8rem; color: var(--success, #5e7a4b); font-weight:600;
+    background: linear-gradient(135deg, rgba(74,144,96,.12), rgba(93,200,136,.08));
+    border:1px solid rgba(93,200,136,.3);
+    border-radius:12px; padding:12px 16px; margin-bottom:14px;
+    font-size:.82rem; color: #5DC888; font-weight:600;
+    box-shadow: 0 0 12px rgba(93,200,136,.1);
 }
 
 /* ── Success screen ── */
 .success-screen { text-align:center; padding:20px 0; }
 .success-screen .big-icon { font-size:4rem; animation:popIn .5s cubic-bezier(.175,.885,.32,1.275); }
-.success-screen h2 { font-size:1.3rem; margin:12px 0 8px; color: var(--text-primary, #4a2e24); }
-.success-screen p  { font-size:.85rem; color: var(--text-secondary, #7a5a4a); }
+.success-screen h2 { font-size:1.3rem; margin:12px 0 8px; color: var(--text-primary, #F5EEE4); }
+.success-screen p  { font-size:.85rem; color: var(--text-secondary, #C4AE96); }
 
 /* ── Spinner ── */
 .spin { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spinR .7s linear infinite; vertical-align:middle; margin-right:5px; }
@@ -108,11 +136,12 @@
 .modal-overlay.hidden { display: none !important; }
 
 .modal-content {
-    background: #fff !important; padding: 30px !important; border-radius: 12px !important; width: 90% !important; max-width: 400px !important;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important; color: #333 !important;
+    background: var(--bg-card, #2D2218) !important; padding: 30px !important; border-radius: 16px !important; width: 90% !important; max-width: 400px !important;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5) !important; color: var(--text-primary, #F5EEE4) !important;
+    border: 1px solid var(--border, #3D2E22) !important;
 }
 .modal-header { display: flex !important; justify-content: space-between !important; align-items: center !important; margin-bottom: 20px !important; }
-.close-btn { background: none !important; border: none !important; font-size: 2rem !important; cursor: pointer !important; color: #999 !important; }
+.close-btn { background: none !important; border: none !important; font-size: 2rem !important; cursor: pointer !important; color: var(--text-muted, #8A7060) !important; }
 
 </style>
 <script>
@@ -721,27 +750,27 @@ VoiceEngine.init({
 
     <!-- ══ FORGOT PASSWORD MODAL ══ -->
     <div id="forgot-modal" class="modal-overlay hidden" style="z-index:9999">
-        <div class="modal-content" style="max-width:400px; background: #fffcf5; border: 2px solid #e6d5c3; color: #4a2e24;">
-            <div class="modal-header" style="border-bottom: 1px solid #e6d5c3;">
-                <h2 style="color: #4a2e24; margin: 0;">Reset Password</h2>
-                <button class="close-btn" onclick="closeForgotModal()" style="color: #a38d82;">×</button>
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border);">
+                <h2 style="color: var(--text-primary); margin: 0;">Reset Password</h2>
+                <button class="close-btn" onclick="closeForgotModal()">×</button>
             </div>
             <div id="forgot-step-1">
-                <p style="color: #7a5a4a; margin-bottom: 15px;">Enter your email to receive a reset OTP.</p>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">Enter your email to receive a reset OTP.</p>
                 <div class="form-group">
-                    <input type="email" class="form-input" id="f-email" placeholder="you@example.com" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                    <input type="email" class="form-input" id="f-email" placeholder="you@example.com">
                 </div>
                 <button class="btn btn-primary" style="width:100%; margin-top: 15px;" onclick="handleForgotRequest()" id="forgot-req-btn">Send OTP →</button>
             </div>
             <div id="forgot-step-2" class="hidden">
-                <p style="color: #7a5a4a; margin-bottom: 15px;">Enter the OTP sent to your email and your new password.</p>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">Enter the OTP sent to your email and your new password.</p>
                 <div class="form-group">
-                    <label class="form-label" style="color: #4a2e24;">OTP</label>
-                    <input type="text" class="form-input" id="f-otp" placeholder="6-digit code" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                    <label class="form-label">OTP</label>
+                    <input type="text" class="form-input" id="f-otp" placeholder="6-digit code">
                 </div>
                 <div class="form-group" style="margin-top: 15px;">
-                    <label class="form-label" style="color: #4a2e24;">New Password</label>
-                    <input type="password" class="form-input" id="f-pass" placeholder="Min 8 characters" style="background:white; border:1px solid #cccccc; color:#4a2e24;">
+                    <label class="form-label">New Password</label>
+                    <input type="password" class="form-input" id="f-pass" placeholder="Min 8 characters">
                 </div>
                 <button class="btn btn-primary" style="width:100%; margin-top: 15px;" onclick="handleForgotConfirm()" id="forgot-conf-btn">Reset Password</button>
             </div>

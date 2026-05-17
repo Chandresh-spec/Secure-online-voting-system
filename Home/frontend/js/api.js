@@ -71,8 +71,10 @@ async function apiCall(endpoint, options = {}, isFormData = false) {
                 return null;
             }
         }
-
-        const data = await response.json();
+        let data = null;
+        if (response.status !== 204) {
+            data = await response.json();
+        }
 
         if (!response.ok) {
             throw { status: response.status, data };
@@ -189,6 +191,14 @@ async function deleteElection(id) {
     return apiCall(`/elections/elections/${id}/`, { method: 'DELETE' });
 }
 
+async function approveElection(id) {
+    return apiCall(`/elections/elections/${id}/approve/`, { method: 'POST' });
+}
+
+async function rejectElection(id) {
+    return apiCall(`/elections/elections/${id}/reject/`, { method: 'POST' });
+}
+
 // ─── Candidates API ───
 
 async function getCandidates(electionId) {
@@ -201,6 +211,18 @@ async function createCandidate(data) {
         method: 'POST',
         body: isFormData ? data : JSON.stringify(data),
     }, isFormData);
+}
+
+async function updateCandidate(id, data) {
+    const isFormData = data instanceof FormData;
+    return apiCall(`/elections/candidates/${id}/`, {
+        method: 'PATCH',
+        body: isFormData ? data : JSON.stringify(data),
+    }, isFormData);
+}
+
+async function deleteCandidate(id) {
+    return apiCall(`/elections/candidates/${id}/`, { method: 'DELETE' });
 }
 
 // ─── Voting API ───
